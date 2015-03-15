@@ -2,16 +2,16 @@
 \alias{cv.rq.pen}
 \title{Cross Validated quantile regression}
 \usage{
-cv.rq.pen(x,y,tau=.5,weights=NULL,lambda=NULL,penalty="LASSO",
+cv.rq.pen(x,y,tau=.5,lambda=NULL,weights=NULL,penalty="LASSO",
           intercept=TRUE,criteria="CV",cvFunc="check",nfolds=10,
           foldid=NULL,nlambda=100,eps=.0001,init.lambda=1,...)
 }
 \arguments{
   \item{x}{ Matrix of predictors.}
   \item{y}{ Vector of response values.}
-  \item{tau}{ Conditional quantile being modeled.}
-  \item{weights}{ Weights for the objective function.}
+  \item{tau}{ Conditional quantile being modeled.}                                           
   \item{lambda}{ Vector of lambdas. Default is for lambdas to be automatically generated.} 
+  \item{weights}{ Weights for the objective function.}
   \item{penalty}{ Type of penalty: "LASSO", "SCAD" or "MCP".}
   \item{intercept}{ Whether model should include an intercept. Constant does not need to be included in "x".}
   \item{criteria}{ How models will be evaluated. Either cross-validation "CV", BIC "BIC" or large P BIC "PBIC".}

@@ -1,0 +1,12 @@
+rqPen 1.1 (Release date: 2015-03-15)
+==============
+
+Changes:
+
+* Corrected errors in SCAD and MCP penalties
+* Combined scad_1_deriv and scad_2_deriv into one function scad_deriv
+* swapped order of weights and lambda in functions rq.lasso.fit, rq.nc.fit and cv.rq.pen
+
+
+rqPen 1.0 (Release date: 2014-10-29)
+==============

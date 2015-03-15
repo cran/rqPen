@@ -6,11 +6,11 @@ pos_part <- function(x){
   min(x,0)
 }
 
-lasso <- function(x,lambda){
+lasso <- function(x,lambda=1){
    lambda*abs(x)
 }
 
-scad <- function(x, lambda=2, a=3.7){
+scad <- function(x, lambda=1, a=3.7){
   if(abs(x) < lambda){
     lambda*abs(x)
   }
@@ -24,23 +24,23 @@ scad <- function(x, lambda=2, a=3.7){
 }
 
 scad_deriv <- function(x, lambda=1,a=3.7){
-  if(x == 0){
+  if(abs(x) <= lambda){
   #really undefined but should be penalized as lambda using the taylor expansion technique
-    lambda
-  } else if(lambda == 0){
+    return_val <- lambda
+  } 
+  if(lambda == 0){
+    return_val <- 0
+  }
+  if(abs(x) > lambda){
+     return_val <- max(a*lambda-abs(x),0)/(a-1)
+  }
+  if(return_val == 0){
     0
+  } else if(x == 0){
+    lambda
+  }else{
+    sign(x)*return_val
   }
-  else{
-    scad_1_deriv(x,lambda,a) - scad_2_deriv(x,lambda,a)
-  }
-}
-
-scad_1_deriv <- function(x,lambda=1,a=3.7){
-  sign(x)*lambda
-}
-
-scad_2_deriv <- function(x,lambda=1,a=3.7){
-  sign(x)*lambda*(1-  ( pos_part(a*lambda-abs(x)) / ( lambda*(a-1))))*(abs(x) > lambda)
 }
 
 mcp <- function(x, lambda=1, a=3){
@@ -83,7 +83,7 @@ randomly_assign <- function(n,k){
 
 model_eval <- function(model, test_x, test_y, func="check",...){
 #func: "check" (Quantile Check), "SqErr" (Squared Error), "AE" (Absolute Value)
-  if(attributes(coefficients(model))$names[1] == "intercept"){
+  if(model$intercept){
     test_x <- cbind(1,test_x)
   }
   fits <- test_x %*% coefficients(model)
@@ -104,7 +104,25 @@ qbic <- function(model, largeP=FALSE){
   bic
 }
 
-cv.rq.pen <- function(x,y,tau=.5,weights=NULL,lambda=NULL,penalty="LASSO",intercept=TRUE,criteria="CV",cvFunc="check",nfolds=10,foldid=NULL,nlambda=100,eps=.0001,init.lambda=1,...){
+coefficients.cv.rq.pen <- function(object, lambda='min'){
+  if(lambda=='min'){
+     lambda <- object$lambda.min
+  }
+  target_model <- which(object$cv[,1] == lambda)
+  coefficients(object$models[[target_model]])
+}
+
+rq.lasso.fit.mult <- function(x,y,tau_seq=c(.1,.3,.5,.7,.9),lambda=NULL,weights=NULL,intercept=TRUE,coef.cutoff=.00000001,...){
+   model_list <- list()
+   iter <- 1
+   for(tau in tau_seq){
+      model_list[[iter]] <- rq.lasso.fit(x,y,tau,lambda,weights,intercept,coef.cutoff,...)
+      iter <- iter+1
+   }
+   model_list
+}
+
+cv.rq.pen <- function(x,y,tau=.5,lambda=NULL,weights=NULL,penalty="LASSO",intercept=TRUE,criteria="CV",cvFunc="check",nfolds=10,foldid=NULL,nlambda=100,eps=.0001,init.lambda=1,...){
 # x is a n x p matrix without the intercept term
 # y is a n x 1 vector
 # criteria used to select lambda is cross-validation (CV), BIC, or PBIC (large P)
@@ -124,9 +142,9 @@ cv.rq.pen <- function(x,y,tau=.5,weights=NULL,lambda=NULL,penalty="LASSO",interc
      searching <- TRUE
      while(searching){
        if(penalty=="LASSO"){
-         init_fit <- rq.lasso.fit(x,y,tau,weights,lambda=lambda_star,intercept,...)
+         init_fit <- rq.lasso.fit(x,y,tau,lambda=lambda_star,weights,intercept,...)
        } else{
-         init_fit <- rq.nc.fit(x,y,tau,weights,lambda=lambda_star,intercept,...)
+         init_fit <- rq.nc.fit(x,y,tau,lambda=lambda_star,weights,intercept,...)
        }
        if(sum(init_fit$coefficients[p_range])==0){
          searching <- FALSE     
@@ -183,7 +201,9 @@ cv.rq.pen <- function(x,y,tau=.5,weights=NULL,lambda=NULL,penalty="LASSO",interc
   return_val
 }
 
-rq.lasso.fit <- function(x,y,tau=.5,weights=NULL,lambda=NULL,intercept=TRUE,coef.cutoff=.00000001,...){
+
+
+rq.lasso.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,coef.cutoff=.00000001,...){
 # x is a n x p matrix without the intercept term
 # y is a n x 1 vector
 # lambda takes values of 1 or p
@@ -241,14 +261,15 @@ rq.lasso.fit <- function(x,y,tau=.5,weights=NULL,lambda=NULL,intercept=TRUE,coef
    return_val$residuals <- model$residuals[1:n]      
    return_val$rho <- sum(sapply(return_val$residuals,check,tau))
    return_val$tau <- tau
-   return_val$n <- n
+   return_val$n <- n                  
+   return_val$intercept <- intercept
    class(return_val) <- c("rq.pen", "rqLASSO")
    return_val
 }
 
 predict.rq.pen <- function(object, newx,...){
   coefs <- object$coefficients
-  if(attributes(coefs)$names[1] == "intercept"){
+  if(object$intercept){
      newx <- cbind(1,newx)
   }
   newx %*% coefs
@@ -263,7 +284,7 @@ predict.cv.rq.pen <- function(object, newx, lambda="lambda.min",...){
   predict(object$models[[target_pos]],newx,...)
 }
 
-rq.nc.fit <- function(x,y,tau=.5,weights=NULL,lambda=NULL,intercept=TRUE,penalty="SCAD",a=3.7,iterations=10,converge_criteria=.0001,...){
+rq.nc.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,penalty="SCAD",a=3.7,iterations=10,converge_criteria=.0001,...){
 # x is a n x p matrix without the intercept term
 # y is a n x 1 vector
 # lambda takes values of 1 or p
@@ -294,12 +315,12 @@ rq.nc.fit <- function(x,y,tau=.5,weights=NULL,lambda=NULL,intercept=TRUE,penalty
    } else{
       pen_range <- intercept + 1:p
    }
-   lambda_update <- lambda
+   lambda_update <- n*lambda
    iter_complete <- FALSE
    iter_num <- 0
    old_beta <- rep(0, p+intercept)
    while(!iter_complete){
-      sub_fit <- rq.lasso.fit(x=x,y=y,tau=tau,weights=weights,lambda=lambda_update,intercept=intercept)
+      sub_fit <- rq.lasso.fit(x=x,y=y,tau=tau,lambda=lambda_update,weights=weights,intercept=intercept)
       if(length(lambda)==1){
           lambda_update <- sapply(abs(sub_fit$coefficients[pen_range]),deriv_func, lambda=lambda, a=a)
       } else{
@@ -308,6 +329,7 @@ rq.nc.fit <- function(x,y,tau=.5,weights=NULL,lambda=NULL,intercept=TRUE,penalty
                                                          lambda=lambda,
                                                          MoreArgs=list(a=a))
       }
+      lambda_update <- n*lambda_update
       iter_num <- 1
       new_beta <- sub_fit$coefficients
       beta_diff <- sum( (old_beta - new_beta)^2)
@@ -325,7 +347,7 @@ rq.nc.fit <- function(x,y,tau=.5,weights=NULL,lambda=NULL,intercept=TRUE,penalty
    sub_fit
 }
 
-beta_plots <- function(model,voi=NULL,logLambda=TRUE,loi=NULL,...){
+beta_plots <- function(model,voi=NULL,logLambda=FALSE,loi=NULL,...){
 #voi - index variables of interest
 #logLambda - lambdas plotted on log scale
 #loi - index of target lambdas
@@ -344,8 +366,8 @@ beta_plots <- function(model,voi=NULL,logLambda=TRUE,loi=NULL,...){
   if(is.null(loi)==FALSE){
      lambdas <- lambdas[loi]
   }                                    
-  plot(lambdas, betas[,1], type="n",ylim=c(min(betas),max(betas)),ylab="Coefficient Value",...)
-  for(i in 2:dim(betas)[2]){
+  plot(lambdas, betas[,1], type="n",ylim=c(min(betas),max(betas)),ylab="Coefficient Value",xlab="Log Lambda",...)
+  for(i in 1:dim(betas)[2]){
     lines(lambdas, betas[,i],col=i)
   }  
 }
@@ -363,3 +385,5 @@ cv_plots <- function(model,logLambda=TRUE,loi=NULL,...){
   }                                    
   plot(cv_data[,1], cv_data[,2], ylab=colnames(cv_data)[2], xlab=colnames(cv_data)[1],...)
 }
+
+

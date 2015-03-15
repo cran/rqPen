@@ -2,15 +2,15 @@
 \alias{rq.lasso.fit}
 \title{Quantile Regression with LASSO penalty}
 \usage{
-rq.lasso.fit(x,y,tau=.5,weights=NULL,lambda=NULL,
+rq.lasso.fit(x,y,tau=.5,lambda=NULL,weights=NULL,
              intercept=TRUE,coef.cutoff=.00000001,...)
 }
 \arguments{
   \item{x}{ Matrix of predictors.}
   \item{y}{ Vector of response values.}
   \item{tau}{ Conditional quantile being modeled.}
-  \item{weights}{ Weights for the objective function.}
   \item{lambda}{ Tuning parameter.}
+  \item{weights}{ Weights for the objective function.}
   \item{intercept}{ Whether model should include an intercept. Constant does not need to be included in "x".}
   \item{coef.cutoff}{ Coefficients below this value will be set to zero.}
   \item{...}{Additional items to be sent to rq. Note this will have to be done carefully as rq is run on the augmented data to account for penalization and could provide strange results if this is not taken into account.}

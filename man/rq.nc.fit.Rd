@@ -2,7 +2,7 @@
 \alias{rq.nc.fit}
 \title{Non-convex penalized quantile regression}
 \usage{
-rq.nc.fit(x,y,tau=.5,weights=NULL,lambda=NULL,intercept=TRUE,
+rq.nc.fit(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,
           penalty="SCAD",a=3.7,iterations=10,
           converge_criteria=.0001,...)
 }
@@ -10,8 +10,8 @@ rq.nc.fit(x,y,tau=.5,weights=NULL,lambda=NULL,intercept=TRUE,
   \item{x}{ Matrix of predictors.}
   \item{y}{ Vector of response values.}
   \item{tau}{ Conditional quantile being modeled.}
-  \item{weights}{ Weights for the objective function.}
   \item{lambda}{ Tuning parameter.} 
+  \item{weights}{ Weights for the objective function.}
   \item{intercept}{ Whether model should include an intercept. Constant does not need to be included in "x".}
   \item{penalty}{ MCP or SCAD.}
   \item{a}{ Second tuning parameter.} 

@@ -2,7 +2,7 @@
 \alias{beta_plots}
 \title{Plots of Betas}
 \usage{
-beta_plots(model,voi=NULL,logLambda=TRUE,loi=NULL,...)
+beta_plots(model,voi=NULL,logLambda=FALSE,loi=NULL,...)
 }
 \arguments{
   \item{model}{"cv.rq.pen" object.}
