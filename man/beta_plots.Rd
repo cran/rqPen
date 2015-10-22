@@ -2,13 +2,13 @@
 \alias{beta_plots}
 \title{Plots of Betas}
 \usage{
-beta_plots(model,voi=NULL,logLambda=FALSE,loi=NULL,...)
+beta_plots(model,voi=NULL,logLambda=TRUE,loi=NULL,...)
 }
 \arguments{
   \item{model}{"cv.rq.pen" object.}
-  \item{voi}{Index of betas to be ploted.  Default is all of the lambdas from "cv.rq.pen" object.}
+  \item{voi}{Index of betas to include. Default is all of the lambdas from "cv.rq.pen" object.}
   \item{logLambda}{Plot of lambdas is on the log scale.}
-  \item{loi}{Index of lambdas to be ploted. Default is all of the lambdas from "cv.rq.pen" object.}
+  \item{loi}{Index of lambdas to include. Default is all of the lambdas from "cv.rq.pen" object.}
   \item{...}{Additional arguments to be sent to plot.}
 }
 \value{

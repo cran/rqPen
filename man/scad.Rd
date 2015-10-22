@@ -7,10 +7,10 @@ scad(x,lambda,a)
 \arguments{
   \item{x}{Number to be evaluated}
   \item{lambda}{Tuning parameter lambda}
-  \item{a}{Tuning paramter a}
+  \item{a}{Tuning parameter a}
 }
 \value{
-SCAD penalty function with tuning paramters lambda and "a" evaluated at "x".
+SCAD penalty function with tuning parameters lambda and "a" evaluated at "x".
 }
 \description{
 SCAD penalty function as described in Fan and Li (2001).

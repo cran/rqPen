@@ -9,8 +9,8 @@ rq.nc.fit(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,
 \arguments{
   \item{x}{ Matrix of predictors.}
   \item{y}{ Vector of response values.}
-  \item{tau}{ Conditional quantile being modeled.}
-  \item{lambda}{ Tuning parameter.} 
+  \item{tau}{ Conditional quantile being modelled.}
+  \item{lambda}{ Tuning parameter.}  
   \item{weights}{ Weights for the objective function.}
   \item{intercept}{ Whether model should include an intercept. Constant does not need to be included in "x".}
   \item{penalty}{ MCP or SCAD.}
@@ -25,13 +25,12 @@ Returns the following:
 \item{PenRho}{ Penalized objective function value.} 
 \item{residuals}{ Residuals from the model.}
 \item{rho}{ Objective function evaluation without the penalty.}
-\item{tau}{ Conditional quantile being modeled.}
+\item{tau}{ Conditional quantile being modelled.}
 \item{n}{ Sample size.}  
 \item{penalty}{ Penalty used, SCAD or MCP.} 
 }
 \description{
-Produces penalized quantile regression models for a range of lambdas and penalty of choice. If lambda is unselected than an iterative algorithm is used to find
-a maximum lambda such that the penalty is large enough to produce an intercept only model. Then range of lambdas goes from the maximum lambda found to "eps" on the log scale. Local linear approximation approach used by Wang, Wu and Li to extend LLA as proposed by Zou and Li (2008) to the quantile regression setting.  
+Produces penalized quantile regression models for a range of lambdas and penalty of choice. If lambda is unselected than an iterative algorithm is used to find a maximum lambda such that the penalty is large enough to produce an intercept only model. Then range of lambdas goes from the maximum lambda found to "eps" on the log scale. Local linear approximation approach used by Wang, Wu and Li to extend LLA as proposed by Zou and Li (2008) to the quantile regression setting.  
 }
 \examples{
 x <- matrix(rnorm(800),nrow=100)

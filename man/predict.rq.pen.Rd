@@ -5,7 +5,7 @@
 \method{predict}{rq.pen}(object, newx,...)
 }
 \arguments{
-  \item{object}{ "rq.pen" model.}
+  \item{object}{ rq.pen object.}
   \item{newx}{ Matrix of covariates used for prediction.}
   \item{...}{Needed for consistency with generic predict.}
 }
@@ -13,7 +13,7 @@
 Returns predicted values from the model.   
 }
 \description{
-Returns predicted values from "rq.pen" model for "newx" covariates.    
+Returns predicted values from "rq.pen" object for "newx" covariates.    
 }
 \examples{
 x <- matrix(rnorm(800),nrow=100)

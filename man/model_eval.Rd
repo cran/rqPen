@@ -12,7 +12,7 @@ model_eval(model, test_x, test_y, func="check",...)
   \item{...}{Additional arguments to be sent to evaluation function. For instance check requires tau which is not part of the model_eval function.}
 }
 \value{
-Mean of prediction errors using the choosen function. 
+Mean of prediction errors using the chosen function. 
 }
 \description{
 Used for cross-validation. For a model of class "rqPen" it provides the average prediction error given the evaluation function of choice.

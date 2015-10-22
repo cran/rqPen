@@ -7,7 +7,7 @@
 \arguments{
   \item{object}{ "cv.rq.pen" object.} 
   \item{newx}{ Matrix of covariates used for prediction.}
-  \item{lambda}{ Lambda associated with the model from which predictions should be made. Default is to use the lambda that provides the minimum criteria (CV or BIC) that was selected by cv.rq.pen.}
+  \item{lambda}{ Lambda associated with the model from which predictions should be made. Default is to use the lambda that provides the minimum criteria (cross-validation or BIC) that was selected by cv.rq.pen.}
   \item{...}{Needed for consistency with generic predict.}
 }
 \value{

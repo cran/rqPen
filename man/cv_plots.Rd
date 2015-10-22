@@ -7,7 +7,7 @@ cv_plots(model,logLambda=TRUE,loi=NULL,...)
 \arguments{
   \item{model}{"cv.rq.pen" object.}
   \item{logLambda}{Plot of lambdas is on the log scale.}
-  \item{loi}{Index of lambdas to be ploted. Default is all of the lambdas from "cv.rq.pen" object.}
+  \item{loi}{Index of lambdas to be plotted. Default is all of the lambdas from "cv.rq.pen" object.}
   \item{...}{Additional items to be sent to plot function.}
 }
 \value{
@@ -15,7 +15,7 @@ Plot of how cross validation statistic changes with lambda.
 }
 \description{
 Slightly misnamed as user could choose BIC as a criteria for "cv.rq.pen" object. Function is able to discern between the two 
-types of evaluation criterias and provides appropriate labels for the plot.  
+types of evaluation criteria and provides appropriate labels for the plot.  
 }
 \examples{
 x <- matrix(rnorm(800),nrow=100)

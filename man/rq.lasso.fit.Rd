@@ -8,7 +8,7 @@ rq.lasso.fit(x,y,tau=.5,lambda=NULL,weights=NULL,
 \arguments{
   \item{x}{ Matrix of predictors.}
   \item{y}{ Vector of response values.}
-  \item{tau}{ Conditional quantile being modeled.}
+  \item{tau}{ Conditional quantile being modelled.}   
   \item{lambda}{ Tuning parameter.}
   \item{weights}{ Weights for the objective function.}
   \item{intercept}{ Whether model should include an intercept. Constant does not need to be included in "x".}
@@ -21,7 +21,7 @@ Returns the following:
 \item{PenRho}{ Penalized objective function value.}
 \item{residuals}{ Residuals from the model.}
 \item{rho}{ Objective function evaluation without the penalty.}
-\item{tau}{ Conditional quantile being modeled.}
+\item{tau}{ Conditional quantile being modelled.}
 \item{n}{ Sample size.}  
 }
 \description{
