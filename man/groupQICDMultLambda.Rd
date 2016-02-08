@@ -1,9 +1,9 @@
-\name{groupMultLambda}
-\alias{groupMultLambda}
-\title{Quantile Regression with Group Penalty for multiple lambdas}
+\name{groupQICDMultLambda}
+\alias{groupQICDMultLambda}
+\title{Quantile Regression with Group Penalty using QICD algorithm for multiple lambdas}
 \usage{
-groupMultLambda(x, y, groups, tau = 0.5, lambda, intercept = TRUE, 
-	penalty="LASSO", alg="QICD", ...) 
+groupQICDMultLambda(x, y, groups, tau = 0.5, lambda, intercept = TRUE, 
+	penalty="LASSO", initial_beta = NULL, ...) 
 }
 \arguments{
   \item{x}{ Matrix of predictors.}
@@ -15,23 +15,21 @@ groupMultLambda(x, y, groups, tau = 0.5, lambda, intercept = TRUE,
   \item{intercept}{ Whether model should include an intercept. Constant does not 
 					need to be included in "x".}
   \item{penalty}{ Type of penalty: "LASSO", "SCAD" or "MCP".}   
-  \item{alg}{"QICD" for QICD implementation. Otherwise linear programming approach is implemented.}
-  \item{...}{Additional parameters to be sent to rq.group.fit.}
+  \item{initial_beta}{Initial value of beta to start algorithm. Default is all zeros.}
+  \item{...}{Additional parameters to be sent to groupQICD.}
 }
 \value{
 Returns a list of rq.group.pen objects. Each element of the list is a fit for a 
 			different value of lambda. 
 }
 \description{
-Fit multiple models with L1 group penalty. QICD algorithm is using an adaptation of the algorithm 
+Fit multiple models with L1 group penalty using an adaptation of the QICD algorithm 
 		presented by Peng and Wang (2015). 
 }
 \examples{
-\dontrun{
 x <- matrix(rnorm(400),nrow=100)
 y <- 1 + x[,1] - 3*x[,3] + rnorm(100)
-cv_model <- groupMultLambda(x,y,groups=c(rep(1,2),rep(2,2)),lambda=seq(.1,.5,.1))
-}
+cv_model <- groupQICDMultLambda(x,y,groups=c(rep(1,2),rep(2,2)),lambda=seq(.1,.5,.1))
 }
 \references{
 [1] Yuan, M. and Lin, Y. (2006). Model selection and estimation in regression with 

@@ -206,9 +206,9 @@ cv.rq.pen <- function(x,y,tau=.5,lambda=NULL,weights=NULL,penalty="LASSO",interc
       test_x <- x[foldid==i,]
       test_y <- y[foldid==i]
       if(penalty=="LASSO"){
-         cv_models <- lapply(lambda,rq.lasso.fit, x=x,y=y,tau=tau,weights=weights,intercept=intercept,...)
+         cv_models <- lapply(lambda,rq.lasso.fit, x=train_x,y=train_y,tau=tau,weights=weights,intercept=intercept,...)
       } else{
-         cv_models <- lapply(lambda,rq.nc.fit, x=x,y=y,tau=tau,weights=weights,intercept=intercept,penalty=penalty,...)
+         cv_models <- lapply(lambda,rq.nc.fit, x=train_x,y=train_y,tau=tau,weights=weights,intercept=intercept,penalty=penalty,...)
       }
       if(cvFunc=="check"){
          cv_results <- cbind(cv_results, sapply(cv_models,model_eval, test_x, test_y, tau=tau))
@@ -256,7 +256,6 @@ rq.lasso.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,coef
    if( sum(lambda < 0) > 0){
       stop(paste('lambda must be positive and we have a lambda of ', lambda, sep=""))
    }
-   lambda <- lambda*n # need this to account for the fact that rq does not normalize the objective function
    if(length(lambda)==1){
       pen_x <- rbind(diag(rep(lambda,p)),diag(rep(-lambda,p)))
    } else{
@@ -350,8 +349,7 @@ rq.nc.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,penalty
    } else{
       pen_range <- intercept + 1:p
    }
-   #lambda_update <- n*lambda
-   lambda_update <- lambda
+   lambda_update <- n*lambda
    iter_complete <- FALSE
    iter_num <- 0
    old_beta <- rep(0, p+intercept)
@@ -365,7 +363,7 @@ rq.nc.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,penalty
                                                          lambda=lambda,
                                                          MoreArgs=list(a=a))
       }
-      #lambda_update <- n*lambda_update
+      lambda_update <- n*lambda_update
       iter_num <- 1
       new_beta <- sub_fit$coefficients
       beta_diff <- sum( (old_beta - new_beta)^2)
@@ -428,7 +426,7 @@ getRho <- function(model){
 
 cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "LASSO", 
     intercept = TRUE, criteria = "CV", cvFunc = "check", nfolds = 10, 
-    foldid = NULL, nlambda = 100, eps = 1e-04, init.lambda = 1,alg="QICD", 
+    foldid = NULL, nlambda = 100, eps = 1e-04, init.lambda = 1, 
     ...) 
 {
     p_range <- 1:dim(x)[2] + intercept
@@ -444,12 +442,12 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
         while(searching){
             if (search_num == 1) {
                 init_fit <- rq.group.fit(x, y, groups, tau, lambda_star, 
-                  intercept, penalty,alg, ...)
+                  intercept, penalty, ...)
                 search_num <- 2
             }
             else {
                 init_fit <- rq.group.fit(x, y, groups, tau, lambda_star, 
-                  intercept, penalty,alg, initial_beta = beta_update, 
+                  intercept, penalty, initial_beta = beta_update, 
                   ...)
             }
             beta_update <- init_fit$coefficients
@@ -472,7 +470,7 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
        fine_tune <- TRUE
        fine_tune_pos <- length(lambda)-1
        while(fine_tune){
-         test_fit <- rq.group.fit(x,y,groups,tau,lambda[fine_tune_pos],intercept,penalty,alg,...)
+         test_fit <- rq.group.fit(x,y,groups,tau,lambda[fine_tune_pos],intercept,penalty)
          if (sum(test_fit$coefficients[p_range]) != 0) {
          #want only one intercept only model
                   fine_tune <- FALSE
@@ -486,9 +484,8 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
          lambda <- exp(seq(log(lambda_min), log(lambda_star), length.out = nlambda))
        }
     }
-    
-    models <- groupMultLambda(x = x, y = y, groups = groups, 
-        tau = tau, lambda = lambda, intercept = intercept, penalty=penalty,alg=alg, ...)
+    models <- groupQICDMultLambda(x = x, y = y, groups = groups, 
+        tau = tau, lambda = lambda, intercept = intercept, penalty=penalty, ...)
     model_coefs  <- sapply(models,coefficients)
     model_resids <- sapply(models,residuals)
     model_rhos <- sapply(models, getRho)
@@ -503,9 +500,9 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
             train_y <- y[foldid != i]
             test_x <- x[foldid == i, ]
             test_y <- y[foldid == i]
-            cv_models <- groupMultLambda(x = train_x, y = train_y, 
+            cv_models <- groupQICDMultLambda(x = train_x, y = train_y, 
                 groups = groups, tau = tau, lambda = lambda, 
-                intercept = intercept,penalty=penalty,alg=alg, ...)
+                intercept = intercept,penalty=penalty, ...)
             if (cvFunc == "check") {
                 cv_results <- cbind(cv_results, sapply(cv_models, 
                   model_eval, test_x, test_y, tau = tau))
@@ -548,7 +545,7 @@ coef.cv.rq.group.pen <- function(object, lambda='min',...){
 }
 
 rq.group.fit <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE, 
-                penalty = "LASSO",alg="QICD", ...) 
+                penalty = "LASSO", alg = "QICD", ...) 
 {
     p <- dim(x)[2]
     if (!penalty %in% c("LASSO", "SCAD", "MCP")) {
@@ -581,115 +578,36 @@ rq.group.fit <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE,
         class(return_val) <- c("rq.group.pen", "rq.pen", "rqNC")
     }
     else {
-        group_num <- length(unique(groups))
-        if (length(lambda) == 1) {
-            lambda <- rep(lambda, group_num)
-        }
-        if (length(lambda) != group_num) {
-             stop("lambdas do not match with group number")
-        }
-        if (sum(groups == 0) > 0) {
-            stop("0 cannot be used as a group")
-        }
-        if (dim(x)[2] != length(groups)) {
-           stop("length of groups must be equal to number of columns in x")
-        }
-        new_lambda <- NULL
-        group_count <- xtabs(~groups)
-        for (g in 1:group_num) {
-             new_lambda <- c(new_lambda, rep(lambda[g], each = group_count[g]))
-        }
-          
         if (penalty == "LASSO") {
+            group_num <- length(unique(groups))
+            if (length(lambda) == 1) {
+                lambda <- rep(lambda, group_num)
+            }
+            if (length(lambda) != group_num) {
+                stop("lambdas do not match with group number")
+            }
+            if (sum(groups == 0) > 0) {
+                stop("0 cannot be used as a group")
+            }
+            if (dim(x)[2] != length(groups)) {
+                stop("length of groups must be equal to number of columns in x")
+            }
+            new_lambda <- NULL
+            group_count <- xtabs(~groups)
+            for (g in 1:group_num) {
+                new_lambda <- c(new_lambda, rep(lambda[g], each = group_count[g]))
+            }
             return_val <- rq.lasso.fit(x, y, tau, new_lambda, 
                 intercept = intercept, ...)
             class(return_val) <- c("rq.group.pen", "rq.pen", 
                 "rqLASSO")
         }
         else {
-            return_val <- rq.group.lin.prog(x,y,groups,tau,lambda,intercept=intercept,penalty=penalty,...)
-            class(return_val) <- c("rq.group.pen", "rq.pen")
+            stop("have not programmed non-qicd nonconvex group algorithm")
         }
     }
     return_val
 }
-
-group_derivs <- function(deriv_func,groups,coefs,lambda,a=3.7){
-   if(length(lambda)==1){
-      lambda <- rep(lambda,length(groups))
-   }
-   derivs <- NULL
-   for(g in 1:length(unique(groups))){
-      g_index <- which(groups==g)
-      current_lambda <- lambda[g]
-      coefs_l1 <- sum(abs(coefs[g_index]))
-      derivs <- c(derivs, deriv_func(coefs_l1,current_lambda,a))
-   }
-   derivs
-}
-
-rq.group.lin.prog <- function(x,y,groups,tau,lambda,intercept=TRUE,eps=1e-05,penalty="SCAD", a=3.7, coef.cutoff=1e-08,
-                                initial_beta=NULL,iterations=10,converge_criteria=.0001,...){
-    group_num <- length(unique(groups))
-    if(length(lambda) == 1){
-       lambda <- rep(lambda,group_num)
-    }
-    if (length(lambda) != group_num) {
-        stop("lambdas do not match with group number")
-    }
-    if (sum(groups == 0) > 0) {
-        stop("0 cannot be used as a group")
-    }
-    if (dim(x)[2] != length(groups)) {
-        stop("length of groups must be equal to number of columns in x")
-    }
-    if (penalty == "SCAD") {
-        deriv_func <- scad_deriv
-    }
-    if (penalty == "MCP") {
-        deriv_func <- mcp_deriv
-    } 
-    
-    new_lambda <- NULL
-    group_count <- xtabs(~groups)
-    for (g in 1:group_num) {
-        new_lambda <- c(new_lambda, rep(lambda[g], each = group_count[g]))
-    }
-    if(is.null(initial_beta)){
-       initial_beta <- rq.lasso.fit(x,y,tau,new_lambda, intercept=intercept, coef.cutoff=coef.cutoff,...)$coefficients
-    }
-    
-    coef_by_group_deriv <- group_derivs(deriv_func, groups, initial_beta,lambda,a)
-    lambda_update <- coef_by_group_deriv[groups]
-    old_beta <- initial_beta
-        
-    iter_complete <- FALSE
-    iter_num <- 0
-    
-    #pen_range <- (1+intercept):(dim(x)[2]+intercept)
-    coef_range <- (1+intercept):(dim(x)[2]+intercept)
-    
-    while(!iter_complete){
-      sub_fit <- rq.lasso.fit(x=x,y=y,tau=tau,lambda=lambda_update,intercept=intercept,...)
-      coef_by_group_deriv <- group_derivs(deriv_func,groups,sub_fit$coefficients[coef_range],lambda,a)
-      lambda_update <- coef_by_group_deriv[groups]
-      iter_num <- 1
-      new_beta <- sub_fit$coefficients
-      beta_diff <- sum( (old_beta - new_beta)^2)
-      if(iter_num == iterations | beta_diff < converge_criteria){
-        iter_complete <- TRUE
-        if(iter_num == iterations & beta_diff > converge_criteria){
-          warning(paste("did not converge after ", iterations, " iterations", sep=""))
-        }
-      } else{
-        old_beta <- new_beta
-      }
-    }
-    sub_fit$penalty <- penalty
-    class(sub_fit) <-  c("rq.pen", "rqNC")
-    sub_fit
-}
-
 
 groupQICD <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE, 
     max_iter = 100, eps = 1e-05, penalty = "SCAD", a = 3.7, coef.cutoff = 1e-08, 
@@ -724,8 +642,6 @@ groupQICD <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE,
     else {
         new_outer_parameters <- initial_beta
     }
-    n <- dim(x)[1]
-    lambda <- n*lambda #again need to normalize for fact that rq minimizes unnormalized penalty function
     outer_loop_done <- FALSE
     outer_count <- 0
     while (!outer_loop_done) {
@@ -793,20 +709,19 @@ groupQICD <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE,
     new_outer_parameters
 }
 
-groupMultLambda <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE, penalty="LASSO", 
-    #initial_beta = NULL,
-    alg="QICD", ...) 
+groupQICDMultLambda <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE, penalty="LASSO", 
+    initial_beta = NULL, ...) 
 {
     return_val <- list()
-    #if (is.null(initial_beta)) {
-    #    initial_beta <- rep(0, dim(x)[2] + intercept)
-    #}
+    if (is.null(initial_beta)) {
+        initial_beta <- rep(0, dim(x)[2] + intercept)
+    }
     pos <- 1
     for (lam in lambda) {
         return_val[[pos]] <- rq.group.fit(x = x, y = y, groups = groups, 
-            tau = tau, lambda = lam, intercept = intercept, penalty=penalty,alg=alg, 
+            tau = tau, lambda = lam, intercept = intercept, penalty=penalty, initial_beta = initial_beta, 
             ...)
-        #initial_beta <- return_val[[pos]]$coefficients
+        initial_beta <- return_val[[pos]]$coefficients
         pos <- pos + 1
     }
     return_val
