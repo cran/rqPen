@@ -4,7 +4,7 @@
 \usage{
 cv.rq.group.pen(x, y, groups, tau = 0.5, lambda = NULL, penalty = "LASSO", 
     intercept = TRUE, criteria = "CV", cvFunc = "check", nfolds = 10, 
-    foldid = NULL, nlambda = 100, eps = 1e-04, init.lambda = 1, 
+    foldid = NULL, nlambda = 100, eps = 1e-04, init.lambda = 1,alg="QICD", 
     ...)
 }
 \arguments{
@@ -22,6 +22,7 @@ cv.rq.group.pen(x, y, groups, tau = 0.5, lambda = NULL, penalty = "LASSO",
   \item{nlambda}{ Number of lambdas for which models are fit.}
   \item{eps}{ Smallest lambda used.}
   \item{init.lambda}{ Initial lambda used to find the maximum lambda. Not needed if lambda values are set.}
+  \item{alg}{Algorithm used for fit. "QICD" or "LP".}
   \item{...}{Additional arguments to be sent to rq.group.fit or groupQICDMultLambda.}   
 }
 \value{
@@ -36,7 +37,7 @@ Returns the following:
 \item{groups}{Group structure for penalty function.}
 }
 \description{
-Similar to cv.rq.pen function, but uses group penalty. Group penalties use the L1 norm instead of L2 for computational convenience. We use a group penalty extension of the QICD algorithm presented by Peng and Wang (2015). 
+Similar to cv.rq.pen function, but uses group penalty. Group penalties use the L1 norm instead of L2 for computational convenience. QICD is a group penalty extension of the algorithm presented by Peng and Wang (2015). LP does a linear programming version of the group penalty. 
 }
 \examples{                           
 \dontrun{
