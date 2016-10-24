@@ -31,7 +31,7 @@ Similar to cv.rq.pen function, but uses group penalty. Group penalties use the L
 \examples{
 x <- matrix(rnorm(800),nrow=100)
 y <- 1 + x[,1] - 3*x[,5] + rnorm(100)
-cv_model <- rq.group.fit(x,y,groups=c(rep(1,4),rep(2,4)),lambda=1)
+cv_model <- rq.group.fit(x,y,groups=c(rep(1,4),rep(2,4)),lambda=1,penalty="SCAD")
 }
 \references{
 [1] Yuan, M. and Lin, Y. (2006). Model selection and estimation in regression with grouped variables. \emph{J. R. Statist. Soc. B}, \bold{68}, 49-67.
@@ -39,4 +39,4 @@ cv_model <- rq.group.fit(x,y,groups=c(rep(1,4),rep(2,4)),lambda=1)
 [2] Peng, B. and Wang, L. (2015). An Iterative Coordinate Descent Algorithm for High-Dimensional Nonconvex Penalized Quantile Regression. \emph{Journal of Computational and Graphical Statistics}, \bold{24}, 676-694.
 
 }
-\author{Ben Sherwood}
+\author{Ben Sherwood; Adam Maidman}

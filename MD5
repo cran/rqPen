@@ -1,9 +1,9 @@
-f36c8f023e744d00ede6c59b19c25d15 *DESCRIPTION
-b36e418cd6ce5ea16b0d4115c7ec19fc *LICENSE
+9a1d1d3f23dc5124311fcd193880725d *DESCRIPTION
+d87bc77e0eb46306780e553a1b126a56 *LICENSE
 1151d962f46fe162198257d36b137b03 *NAMESPACE
-89a49d992d6e29d3fcaa929be8b75c0b *NEWS
-93d88a3772670a6d8135d73e2e5333a5 *R/Adamsfunc.R
-aaf0e5fecae534f988097808615479c4 *R/mainFunctions.R
+f5f12b1777c71cd95cf5fc7b52c8d791 *NEWS
+b3e41c501df52dc1639ca8579110a228 *R/Adamsfunc.R
+ff1c4971128ab0603350f3aa6146aaa9 *R/mainFunctions.R
 05d4b456a99d600fe03c3283276463af *R/workHorse.R
 079137c7af403174821ae24572a0ccf9 *man/QICD.Rd
 517d859f2c1099944c61684be821abdd *man/beta_plots.Rd
@@ -33,7 +33,7 @@ f6236d688acb2e50a3f431fdc45bd8b1 *man/pos_part.Rd
 9f8a8f5de40825a540b0f00c4dcb7842 *man/print.rq.pen.Rd
 88ea503af4717dbcdb968e2a7d31f04d *man/qbic.Rd
 61e50db77ce2615295627b1ffd7d5420 *man/randomly_assign.Rd
-07a2555c9efad4463e49d581b1565f65 *man/rq.group.fit.Rd
+2a5680095034eba02480b473f8f87ead *man/rq.group.fit.Rd
 7b01b922deda0f05cec89d6e40014b58 *man/rq.group.lin.prog.Rd
 11913dd8abe0274d56f013d48a3f19de *man/rq.lasso.fit.Rd
 c8172d08508a8a2d71eec50285d59385 *man/rq.lasso.fit.mult.Rd
@@ -42,7 +42,7 @@ a2a625f6740d495d8699daab89129064 *man/scad.Rd
 d7b41ea36e980461f1be5cbd7fbd667c *man/scad_deriv.Rd
 b17982c2f57910397f1025aba9f888a3 *man/square.Rd
 bda0ebc1c480b97ce4c9cb3b2ddaf9a9 *src/Makevars
-87e1004ca89e347d20494cbe3ed1d2c8 *src/QCD.cpp
+387d8c6a6d800e8d5c06233949ce5125 *src/QCD.cpp
 820dbe94b51decb103678f8ed4b66565 *src/rqbr.f
 5676042109bc6a20148f33744f0064e9 *src/rqfnb.f
 f8f6457c4a1dda8e1284587b785dd390 *src/xssort.f
