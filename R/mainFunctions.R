@@ -50,6 +50,8 @@ coef.cv.rq.pen <- function(object, lambda='min',...){
   coefficients(object$models[[target_model]])
 }
 
+
+
 cv.rq.pen <- function(x,y,tau=.5,lambda=NULL,weights=NULL,penalty="LASSO",intercept=TRUE,criteria="CV",cvFunc="check",nfolds=10,foldid=NULL,nlambda=100,eps=.0001,init.lambda=1,penVars=NULL,...){
 # x is a n x p matrix without the intercept term
 # y is a n x 1 vector
@@ -132,10 +134,11 @@ cv.rq.pen <- function(x,y,tau=.5,lambda=NULL,weights=NULL,penalty="LASSO",interc
       train_y <- y[foldid!=i]
       test_x <- x[foldid==i,]
       test_y <- y[foldid==i]
+	  train_weights <- weights[foldid!=i]
       if(penalty=="LASSO"){
-         cv_models <- lapply(lambda,rq.lasso.fit, x=train_x,y=train_y,tau=tau,weights=weights,intercept=intercept,penVars=penVars,...)
+         cv_models <- lapply(lambda,rq.lasso.fit, x=train_x,y=train_y,tau=tau,weights=train_weights,intercept=intercept,penVars=penVars,...)
       } else{
-         cv_models <- lapply(lambda,rq.nc.fit, x=train_x,y=train_y,tau=tau,weights=weights,intercept=intercept,penalty=penalty,penVars=penVars,...)
+         cv_models <- lapply(lambda,rq.nc.fit, x=train_x,y=train_y,tau=tau,weights=train_weights,intercept=intercept,penalty=penalty,penVars=penVars,...)
       }
       if(cvFunc=="check"){
          cv_results <- cbind(cv_results, sapply(cv_models,model_eval, test_x, test_y, tau=tau))
@@ -163,40 +166,77 @@ cv.rq.pen <- function(x,y,tau=.5,lambda=NULL,weights=NULL,penalty="LASSO",interc
 }
 
 
+re_order_nonpen_coefs <- function(nonpen_coefs, penVars, intercept=TRUE){
+	p <- length(nonpen_coefs)
+	new_coefs <- rep(NA,p)
+	if(intercept){
+		penVars <- penVars+1
+		pen_output <- 2:(length(penVars)+1)
+	} else{
+		pen_output <- 1:length(penVars)
+	}
+	new_coefs[penVars] <- nonpen_coefs[pen_output]
+	new_coefs[-penVars] <- nonpen_coefs[-pen_output]
+	new_coefs
+}
 
-rq.nc.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,penalty="SCAD",a=3.7,iterations=10,converge_criteria=1e-06,alg=ifelse(p<50,"LP","QICD"),penVars=NULL,...){
+
+rq.nc.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,
+                      penalty="SCAD",a=3.7,iterations=10,converge_criteria=1e-06,
+                      alg=ifelse(p<50,"LP","QICD"),penVars=NULL,...){
 # x is a n x p matrix without the intercept term
 # y is a n x 1 vector
 # lambda takes values of 1 or p
 # penalty SCAD or MCP
 # penVars - variables to be penalized, doesn't work if lambda has multiple entries
-   p <- dim(x)[2]
-   n <- dim(x)[1]
-   if(alg=="QICD"){
-	 if(length(lambda) > 1){
-		stop("QICD algorithm currently only allows one value of lambda")		
-	 } else{
-		#so qicd algorithm is on the same scale as the lp algorithm
-		lambda <- n*lambda
-	 }
-	 if(is.null(penVars)==TRUE){
-		return_val <- QICD(y, x, tau,lambda, weights, intercept=intercept,penalty=penalty,a=a, 
-							converge_criteria=converge_criteria, ...)
-	 } else{
-		x_pen <- x[,penVars]
-		z <- x[,-penVars]
-		return_val <- QICD.nonpen(x_pen, z, y, tau,lambda, weights, intercept=intercept,penalty=penalty,a=a, 
-								converge_criteria=converge_criteria,...)
-		final_coefs <- rep(0,p)
-		penTotal <- length(penVars)
-		final_coefs[penVars] <- return_val$coefficients[seq(1+intercept,penTotal+intercept)]
-		final_coefs[-penVars] <- return_val$coefficients[seq(penTotal+intercept+1,p+intercept)]
-		if(intercept){
-			final_coefs <- c(coefficients(return_val)[1],final_coefs)
-		}
-		return_val$coefficients <- final_coefs
-	 }
-	} else{
+  p <- ncol(x)
+  n <- nrow(x)
+
+  if( alg=="QICD" ){
+  ### QICD Algorithm ###
+	coefnames <- paste("x",1:p, sep="") ### Coefficient names
+    if( length(lambda) != 1 )
+      stop( "QICD Algorithm only allows 1 lambda value")	
+    ### Check if we are using QICD or QICD.nonpen
+    if( is.null(penVars) | length(penVars) == p){ ### No unpenalized coefficients
+      
+      coefs <- QICD(y, x, tau, lambda, intercept, penalty, eps=converge_criteria, a=a, ...)
+      penbeta <- intercept + 1:p ### Use later to calculate objective function
+    } else { ### Some unpenalized coefficients
+      z    <- as.matrix(x[,-penVars])
+      xpen <- as.matrix(x[,penVars])
+      #coefnames <- paste("x",1:ncol(xpen), sep="") ### Coefficient names
+      #coefnames <- c( coefnames, paste("z",1:ncol(z), sep="") )
+      penbeta <- intercept + penVars ### Use later to calculate objective function
+      coefs <- QICD.nonpen(y, xpen, z, tau, lambda, intercept, penalty, eps=converge_criteria, a=a, ...)
+	  coefs <- re_order_nonpen_coefs(coefs, penVars, intercept)
+    }
+
+    ### Add extra information to QICD output
+    
+    if( intercept ){ ### Residuals
+      residuals <- c( y - x%*%(coefs[-1]) - coefs[1] )
+	  names(coefs) <- c("intercept",coefnames)
+    } else {
+      residuals <- c( y - x%*%coefs )
+	  names(coefs) <- coefnames
+    }
+    rho <- sum( check(residuals) )
+	#1/n*sum( check(residuals) ) ### rho
+    if( penalty == "LASSO" ){ ### PenRho for LASSO
+      PenRho <- sum( abs( coefs[penbeta] )*lambda )
+    } else if( penalty == "SCAD" ){ ### PenRho for SCAD
+      PenRho <- sum( scad( coefs[penbeta], lambda, a ))
+    } else { ### PenRho for MCP
+      PenRho <- sum( mcp( coefs[penbeta], lambda, a ))
+    }
+    PenRho <- rho + PenRho
+
+    sub_fit <- list( coefficients=coefs,  PenRho=PenRho, residuals=residuals,
+                     rho=rho, tau=tau, n=n , intercept=intercept)
+  ######################
+  } else {  
+  ###  LP Algorithm  ###
 	   if(penalty=="SCAD"){
 		 deriv_func <- scad_deriv
 	   }
@@ -257,10 +297,11 @@ rq.nc.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,penalty
 			old_beta <- new_beta
 		  }
 	   }
-	   sub_fit$penalty <- penalty
-	   class(sub_fit) <-  c("rq.pen", "rqNC")
-	   return_val <- sub_fit
-	}
+    ######################
+    }
+	 sub_fit$penalty <- penalty
+	 class(sub_fit) <-  c("rq.pen", "rqNC")
+	 return_val <- sub_fit
 	return(return_val)
 }
 
@@ -309,10 +350,14 @@ getRho <- function(model){
 
 cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "LASSO", 
     intercept = TRUE, criteria = "CV", cvFunc = "check", nfolds = 10, 
-    foldid = NULL, nlambda = 100, eps = 1e-04, init.lambda = 1,alg="QICD", 
+    foldid = NULL, nlambda = 100, eps = 1e-04, init.lambda = 1,alg="QICD",penGroups=NULL,
     ...) 
 {
-    p_range <- 1:dim(x)[2] + intercept
+	if(is.null(penGroups)){
+		p_range <- 1:dim(x)[2] + intercept
+    } else{
+		p_range <- which(groups %in% penGroups) + intercept
+	}
     n <- dim(x)[1]
     pen_func <- switch(which(c("LASSO", "SCAD", "MCP") == penalty), 
         lasso, scad, mcp)
@@ -325,12 +370,12 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
         while(searching){
             if (search_num == 1) {
                 init_fit <- rq.group.fit(x, y, groups, tau, lambda_star, 
-                  intercept, penalty,alg, ...)
+                  intercept, penalty,alg,penGroups=penGroups, ...)
                 search_num <- 2
             }
             else {
                 init_fit <- rq.group.fit(x, y, groups, tau, lambda_star, 
-                  intercept, penalty,alg, initial_beta = beta_update, 
+                  intercept, penalty,alg, initial_beta = beta_update, penGroups=penGroups,
                   ...)
             }
             beta_update <- init_fit$coefficients
@@ -338,8 +383,16 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
                 searching <- FALSE
             }
             else {
-                 lambda_star = max((inter_only_rho-init_fit$rho)/ sum(sapply(init_fit$coefficients[p_range],pen_func, 1)),
-                                    lambda_star+1)
+				option_1 <- (inter_only_rho-init_fit$rho)/ sum(sapply(init_fit$coefficients[p_range],pen_func, 1))
+				option_2 <- lambda_star*search_num
+				if(option_1 >= option_2){
+					lambda_star <- option_1
+				} else{
+					lambda_star <- option_2
+					search_num <- search_num + 1
+				}
+                # lambda_star = max((inter_only_rho-init_fit$rho)/ sum(sapply(init_fit$coefficients[p_range],pen_func, 1)),
+                #                    lambda_star+1)
                  #this is sort of a hack, need to think of a better way to pick lambda_star
                 #lambda_star = inter_only_rho/sum(sapply(init_fit$coefficients[p_range], 
                 #  pen_func, 1))
@@ -349,11 +402,11 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
        }
           
        lambda_min <- eps * lambda_star
-       lambda <- exp(seq(log(lambda_min), log(lambda_star), length.out = nlambda))
+       lambda <- exp(seq(log(lambda_star), log(lambda_min),  length.out = nlambda))
        fine_tune <- TRUE
        fine_tune_pos <- length(lambda)-1
        while(fine_tune){
-         test_fit <- rq.group.fit(x,y,groups,tau,lambda[fine_tune_pos],intercept,penalty,alg,...)
+         test_fit <- rq.group.fit(x,y,groups,tau,lambda[fine_tune_pos],intercept,penalty,alg,penGroups=penGroups,...)
          if (sum(test_fit$coefficients[p_range]) != 0) {
          #want only one intercept only model
                   fine_tune <- FALSE
@@ -364,12 +417,12 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
        if(fine_tune_pos != (length(lambda)-1)){
          lambda_star <- lambda[fine_tune_pos+1]
          lambda_min <- eps*lambda_star
-         lambda <- exp(seq(log(lambda_min), log(lambda_star), length.out = nlambda))
+         lambda <- exp(seq(log(lambda_star), log(lambda_min),  length.out = nlambda))
        }
     }
     
     models <- groupMultLambda(x = x, y = y, groups = groups, 
-        tau = tau, lambda = lambda, intercept = intercept, penalty=penalty,alg=alg, ...)
+        tau = tau, lambda = lambda, intercept = intercept, penalty=penalty,alg=alg,penGroups=penGroups, ...)
     model_coefs  <- sapply(models,coefficients)
     model_resids <- sapply(models,residuals)
     model_rhos <- sapply(models, getRho)
@@ -386,7 +439,7 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
             test_y <- y[foldid == i]
             cv_models <- groupMultLambda(x = train_x, y = train_y, 
                 groups = groups, tau = tau, lambda = lambda, 
-                intercept = intercept,penalty=penalty,alg=alg, ...)
+                intercept = intercept,penalty=penalty,alg=alg,penGroups=penGroups, ...)
             if (cvFunc == "check") {
                 cv_results <- cbind(cv_results, sapply(cv_models, 
                   model_eval, test_x, test_y, tau = tau))
@@ -421,48 +474,64 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
 }
 
 rq.group.fit <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE, 
-                penalty = "LASSO",alg="QICD", ...) 
+                penalty = "LASSO", alg="QICD", a=3.7,penGroups=NULL, ...) 
 {
-    ### Some cleaning/checking before getting to the algorithms
-    p <- dim(x)[2]
-    if (!penalty %in% c("LASSO", "SCAD", "MCP")) {
-        stop("Penalty must be LASSO, SCAD or MCP")
-    }
-    if(is.null(dim(x))){ stop("x must be matrix with at least 1 column") }
-    if(length(groups)!=ncol(x)){
-      stop("length(groups) must be equal to ncol(x)")
-    }
-    if( lambda <= 0 ){ stop("lambda must be positive")}
+  ### Some cleaning/checking before getting to the algorithms
+  p <- ncol(x)
+  n <- nrow(x)
+  #if(is.null(penGroups) & max(penGroups) > max(groups)){ stop("penalize groups not coefficients")}  
+  if (!penalty %in% c("LASSO", "SCAD", "MCP")) {
+      stop("Penalty must be LASSO, SCAD or MCP")
+  }
+  if(is.null(dim(x))){ stop("x must be matrix with at least 1 column") }
+  if(length(groups)!=ncol(x)){
+    stop("length(groups) must be equal to ncol(x)")
+  }
+  if( lambda <= 0 ){ stop("lambda must be positive")}
+  
+  if(penalty=="LASSO"){
+	pen_func <- lasso
+  }
+  if(penalty=="SCAD"){
+	pen_func <- scad
+  }
+  if(penalty=="MCP"){
+	pen_func <- mcp
+  }
 
-    if (alg == "QICD") {
-        # coefs <- groupQICD(x = x, y = y, groups = groups, lambda = lambda, 
-        #     tau = tau, intercept = intercept, penalty = penalty, 
-        #     ...)
-        coefs <- groupQICD2(x=x, y=y, groups=groups, tau = tau, 
-                lambda=lambda, intercept = intercept, 
-                penalty = penalty, a = 3.7, ...)
-        return_val <- list()
-        return_val$coefficients <- coefs
-        if (is.null(colnames(x))) {
-            x_names <- paste("x", 1:p, sep = "")
-        }
-        else {
-            x_names <- colnames(x)
-        }
-        if (intercept) {
-            x_names <- c("intercept", x_names)
-        }
-        attributes(return_val$coefficients)$names <- x_names
-        if (intercept) {
-            x <- cbind(1, x)
-        }
-        return_val$residuals <- y - x %*% coefs
-        return_val$rho <- sum(check(return_val$residuals))
-        return_val$tau <- tau
-        return_val$n <- dim(x)[1]
-        return_val$intercept <- intercept
-        class(return_val) <- c("rq.group.pen", "rq.pen", "rqNC")
+  if (alg == "QICD") {
+  ### QICD Algorithm ###
+    if( length(lambda) != 1 )
+      stop( "QICD Algorithm only allows 1 lambda value")
+
+    coefs <- QICD.group(y, x, groups, tau, lambda, intercept, penalty, ...)
+
+    ### Add extra information to QICD output
+    coefnames <- paste("x",1:p, sep="") ### Coefficient names
+    if(intercept)
+      coefnames <- c("(Intercept)", coefnames)
+    names(coefs) <- coefnames
+    if( intercept ){ ### Residuals
+      residuals <- c( y - x%*%(coefs[-1]) - coefs[1] )
+	  pen_vars <- coefs[-1]
     } else {
+      residuals <- c( y - x%*%coefs )
+	  pen_vars <- coefs
+    }
+	if(penalty=="LASSO"){
+		pen_val <- sum(pen_func(tapply(abs(pen_vars),groups,sum),lambda=lambda))
+	} else{
+		pen_val <- sum(pen_func(tapply(abs(pen_vars),groups,sum),lambda=lambda,a=a))
+	}
+	
+    rho <- sum( check(residuals) ) # rho (similiar to quantreg)
+		#1/n*sum( check(residuals) ) ### rho
+	PenRho <- rho+pen_val
+
+    return_val <- list( coefficients=coefs, PenRho=PenRho, residuals=residuals, rho=rho, tau=tau, n=n, intercept=intercept, penalty=penalty)
+	class(return_val) <- c("rq.group.pen", "rq.pen")
+  ######################
+  } else {
         group_num <- length(unique(groups))
         if (length(lambda) == 1) {
             lambda <- rep(lambda, group_num)
@@ -476,20 +545,23 @@ rq.group.fit <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE,
         if (dim(x)[2] != length(groups)) {
            stop("length of groups must be equal to number of columns in x")
         }
-        new_lambda <- NULL
-        group_count <- xtabs(~groups)
-        for (g in 1:group_num) {
-             new_lambda <- c(new_lambda, rep(lambda[g], each = group_count[g]))
-        }
           
-        if (penalty == "LASSO") {
+        if (penalty == "LASSO") {			
+			new_lambda <- NULL
+			group_count <- xtabs(~groups)
+			for (g in 1:group_num) {
+				 new_lambda <- c(new_lambda, rep(lambda[g], each = group_count[g]))
+			}
+			if(is.null(penGroups)==FALSE){
+				new_lambda[-which(groups %in% penGroups)] <- 0
+			}
             return_val <- rq.lasso.fit(x, y, tau, new_lambda, 
                 intercept = intercept, ...)
             class(return_val) <- c("rq.group.pen", "rq.pen", 
                 "rqLASSO")
         }
         else {
-            return_val <- rq.group.lin.prog(x,y,groups,tau,lambda,intercept=intercept,penalty=penalty,...)
+            return_val <- rq.group.lin.prog(x,y,groups,tau,lambda,intercept=intercept,penalty=penalty,penGroups=penGroups,...)
             class(return_val) <- c("rq.group.pen", "rq.pen")
         }
     }
@@ -501,6 +573,30 @@ plot.cv.rq.group.pen <- function (x,y=NULL,...)
     plot(x$cv[, 1], x$cv[, 2])
 }
 
-
+qaSIS <- function(x,y,tau=.5,linear=FALSE,...){#n.cores=1,...){
+	if(linear){
+		eval_function<- function(x,y,tau){ 
+							q1 <- rq(y ~ x, tau)
+							sum((fitted(q1)-quantile(y,tau))^2)
+						}
+		eval_results <- apply(x,2,eval_function,y,tau,...)
+	} else{
+		eval_function2 <- function(x,y,tau,...){ 
+							 b <- bs(x,...)
+							 q1 <- rq(y ~ b, tau)
+							 sum((fitted(q1)-quantile(y,tau))^2)
+						 }
+		eval_results <- apply(x,2,eval_function2,y,tau,...)
+	}
+	#if(n.cores==1){
+		
+	#} else{
+	#	p <- dim(x)[2]
+	#	mc_func <- function(idx,...){ eval_function(x[,idx],y,...)}
+	#	mc_results <- mclapply(1:p, mc_func, mc.cores=n.cores, ...)
+	#	eval_results <- do.call(c,mc_results)
+	#}
+	order( eval_results, decreasing=TRUE)
+}
 
 

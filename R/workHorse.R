@@ -112,7 +112,7 @@ rq.lasso.fit.mult <- function(x,y,tau_seq=c(.1,.3,.5,.7,.9),lambda=NULL,weights=
 }
 
 rq.lasso.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,
-                         coef.cutoff=1e-08, method="br",penVars=NULL, ...){
+                         coef.cutoff=1e-08, method=NULL,penVars=NULL, ...){
 # x is a n x p matrix without the intercept term
 # y is a n x 1 vector
 # lambda takes values of 1 or p
@@ -120,7 +120,7 @@ rq.lasso.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,
 # Choose the method used to estimate the coefficients ("br" or "fn")
 ### According to quantreg manual and my experience, "fn" is much faster for big n
 ### The "n" can grow rapidly using lin. prog. approach  
-# penVars - variables to be penalized, doesn't work if lambda has multiple entries
+# penVars - variables to be penalized, doesn't work if lambda has multiple entries (Ben: I think it does though it is a little bit strange to do)
 
    if(is.null(dim(x))){
       stop('x needs to be a matrix with more than 1 column')
@@ -136,10 +136,47 @@ rq.lasso.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,
    if( sum(lambda < 0) > 0){
       stop(paste('lambda must be positive and we have a lambda of ', lambda, sep=""))
    }
-   if(is.null(penVars) !=TRUE & length(lambda) == 1){
-      mult_lambda <- rep(0,p)
-      mult_lambda[penVars] <- lambda
-      lambda <- mult_lambda
+   if(is.null(method)){
+	 if(n + 2*p < 500){
+		method <- "br"
+	 } else{
+		method <- "fn"
+	 }
+   }
+
+   # ##############################################################################################
+   # ### This uses the LASSO.fit or LASSO.fit.nonpen functions to obtain coefficient estimates. ###
+   # ### Note that the coefficients might need to be reordered to match x.                      ###
+   # ##############################################################################################
+   # if( !is.null(weights) & length(weights) != n )
+   #    stop("Length of weights does not match length of y")
+
+   # ### Find indices of penalized and nonpenalized coefficients
+   # nonpenVars <-     ### indices of nonpenalized coefficients (lambdas of 0 or not included in penVars), NULL if no nonpenalized oefficients
+   # penVars    <-     ### indices of penalized coefficients
+
+   # xnew <- as.matrix( x[,penVars] )
+   # if( is.null(nonpenVars) ){
+   #   coefs <- LASSO.fit(y, xnew, tau, intercept, coef.cutoff, weights)
+   # } else {
+   #   znew <- as.matrix( x[,nonpenVars] )
+   #   coefs <- LASSO.fit.nonpen(y, xnew, znew, tau, intercept, coef.cutoff, weights)
+   #   coefs[ intercept + 1:p ] <- coefs[ intercept + order(c(penVars, nonpenVars)) ]
+   # }
+
+   # ### coefs are the coefficients in the correct order with the intercept first
+   # ##############################################################################################
+   # ##############################################################################################
+   # ##############################################################################################
+
+   if(is.null(penVars) !=TRUE){# & length(lambda) == 1){
+      if(length(lambda)==1){
+		  mult_lambda <- rep(0,p)
+		  mult_lambda[penVars] <- lambda
+		  lambda <- mult_lambda
+	  } else{
+		lambda[-penVars] <- 0
+	  }
    }
    lambda <- lambda*n # need this to account for the fact that rq does not normalize the objective function
    if(length(lambda)==1){
@@ -155,14 +192,14 @@ rq.lasso.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,
    }
    aug_y <- c(y, rep(0,aug_n))
    if(is.null(weights)){
-     model <- rq(aug_y ~ aug_x+0, tau=tau, method=method,...)
+     model <- rq(aug_y ~ aug_x+0, tau=tau, method=method)
    } else{
      if(length(weights) != n){
        stop("Length of weights does not match length of y")
      }
      orig_weights <- weights
      weights <- c(weights, rep(1,aug_n))
-     model <- rq(aug_y ~ aug_x+0, tau=tau, weights=weights, method=method,...)
+     model <- rq(aug_y ~ aug_x+0, tau=tau, weights=weights, method=method)
    }
    p_star <- p+intercept
    coefs <- coefficients(model)[1:p_star]
@@ -236,7 +273,7 @@ group_derivs <- function(deriv_func,groups,coefs,lambda,a=3.7){
 }
 
 rq.group.lin.prog <- function(x,y,groups,tau,lambda,intercept=TRUE,eps=1e-05,penalty="SCAD", a=3.7, coef.cutoff=1e-08,
-                                initial_beta=NULL,iterations=10,converge_criteria=.0001,...){
+                                initial_beta=NULL,iterations=10,converge_criteria=.0001,penGroups=NULL,...){
     group_num <- length(unique(groups))
     if(length(lambda) == 1){
        lambda <- rep(lambda,group_num)
@@ -262,8 +299,12 @@ rq.group.lin.prog <- function(x,y,groups,tau,lambda,intercept=TRUE,eps=1e-05,pen
     for (g in 1:group_num) {
         new_lambda <- c(new_lambda, rep(lambda[g], each = group_count[g]))
     }
+	if(is.null(penGroups)==FALSE){
+		zero_pen_spots <- which(!groups %in% penGroups)
+		new_lambda[zero_pen_spots] <- 0
+	}
     if(is.null(initial_beta)){
-       initial_beta <- rq.lasso.fit(x,y,tau,new_lambda, intercept=intercept, coef.cutoff=coef.cutoff,method="br",...)$coefficients
+       initial_beta <- rq.lasso.fit(x,y,tau,new_lambda, intercept=intercept, coef.cutoff=coef.cutoff,...)$coefficients
     }
     
     coef_by_group_deriv <- group_derivs(deriv_func, groups, initial_beta,lambda,a)
@@ -280,6 +321,9 @@ rq.group.lin.prog <- function(x,y,groups,tau,lambda,intercept=TRUE,eps=1e-05,pen
       sub_fit <- rq.lasso.fit(x=x,y=y,tau=tau,lambda=lambda_update,intercept=intercept,...)
       coef_by_group_deriv <- group_derivs(deriv_func,groups,sub_fit$coefficients[coef_range],lambda,a)
       lambda_update <- coef_by_group_deriv[groups]
+	  if(is.null(penGroups)==FALSE){
+		lambda_update[zero_pen_spots] <- 0
+	  }
       iter_num <- 1
       new_beta <- sub_fit$coefficients
       beta_diff <- sum( (old_beta - new_beta)^2)
@@ -298,134 +342,50 @@ rq.group.lin.prog <- function(x,y,groups,tau,lambda,intercept=TRUE,eps=1e-05,pen
 }
 
 
-groupQICD <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE, 
-    max_iter = 100, eps = 1e-05, penalty = "SCAD", a = 3.7, coef.cutoff = 1e-08, 
-    initial_beta = NULL, method="br") 
-{
-    ### Choose the method used to estimate the coefficients ("br" or "fn")
-    ### According to quantreg manual and my experience, "fn" is much faster for big n
-    ### Depending on group size, the "n" can grow rapidly using lin. prog. approach
-    if(method=="br"){
-      rqCoef <- shortrq.fit.br
-    } else {
-      rqCoef <- shortrq.fit.fnb
-    }
-
-    group_num <- length(unique(groups))
-    if (length(lambda) == 1) {
-        lambda <- rep(lambda, group_num)
-    }
-    if (length(lambda) != group_num) {
-        stop("lambdas do not match with group number")
-    }
-    if (sum(groups == 0) > 0) {
-        stop("0 cannot be used as a group")
-    }
-    if (dim(x)[2] != length(groups)) {
-        stop("length of groups must be equal to number of columns in x")
-    }
-    if (intercept) {
-        x <- cbind(1, x)
-        groups <- c(0, groups)
-    }
-    if (penalty == "SCAD") {
-        deriv_func <- scad_deriv
-    }
-    if (penalty == "MCP") {
-        deriv_func <- mcp_deriv
-    }
-    if (is.null(initial_beta)) {
-        new_outer_parameters <- rep(0, dim(x)[2])
-    }
-    else {
-        new_outer_parameters <- initial_beta
-    }
-    n <- dim(x)[1]
-    lambda <- n*lambda #again need to normalize for fact that rq minimizes unnormalized penalty function
-    outer_loop_done <- FALSE
-    outer_count <- 0
-    while (!outer_loop_done) {
-        inner_loop_done <- FALSE
-        inner_count <- 0
-        old_outer_parameters <- new_outer_parameters
-        new_inner_parameters <- old_outer_parameters
-        if (penalty == "LASSO") {
-            loop_lambdas <- lambda
-        }
-        if (penalty == "SCAD" | penalty == "MCP") {
-            loop_lambdas <- NULL
-            for (g in unique(groups)) {
-                if (g != 0) {
-                  if (lambda[g] != 0) {
-                    active_vars <- which(groups == g)
-                    loop_lambdas <- c(loop_lambdas, deriv_func(sum(abs(new_outer_parameters[active_vars])), 
-                      lambda[g], a))
-                  }
-                }
-            }
-        }
-        while (!inner_loop_done) {
-            old_inner_parameters <- new_inner_parameters
-            for (g in unique(groups)) {
-                active_vars <- which(groups == g)
-                y_star <- y - x[, -active_vars] %*% new_inner_parameters[-active_vars]
-                if (g == 0 || loop_lambdas[g] == 0) {
-                  ### I made a change here
-                  q1 <- rqCoef(x=x[, active_vars], y=y_star, tau = tau)
-                  new_inner_parameters[active_vars] <- q1
-                }
-                else {
-                  y_aug <- c(y_star, rep(0, 2 * length(active_vars)))
-                  x_aug <- x
-                  lam_val <- loop_lambdas[g]
-                  for (spots in active_vars) {
-                    row_1_aug <- row_2_aug <- rep(0, dim(x)[2])
-                    row_1_aug[spots] <- lam_val
-                    row_2_aug[spots] <- -lam_val
-                    x_aug <- rbind(x_aug, row_1_aug, row_2_aug)
-                  }
-                  ### I made a change here
-                  q1 <- rqCoef(x=x[, active_vars], y=y_star, tau = tau)
-                  new_inner_parameters[active_vars] <- q1
-                }
-            }
-            if (sum((new_inner_parameters - old_inner_parameters)^2) < 
-                eps | inner_count == max_iter) {
-                inner_loop_done <- TRUE
-            }
-            else {
-                inner_count <- inner_count + 1
-            }        
-		}
-        new_outer_parameters <- new_inner_parameters
-        if (sum((new_outer_parameters - old_outer_parameters)^2) < 
-            eps | outer_count == max_iter) {
-            outer_loop_done <- TRUE
-        }
-        else {
-            outer_count <- outer_count + 1
-        }
-    }
-    new_outer_parameters[abs(new_outer_parameters) < coef.cutoff] <- 0
-    new_outer_parameters
-}
 
 groupMultLambda <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE, penalty="LASSO", 
     #initial_beta = NULL,
-    alg="QICD", ...) 
+    alg="QICD_warm",penGroups=NULL, ...) 
 {
-    return_val <- list()
-    #if (is.null(initial_beta)) {
-    #    initial_beta <- rep(0, dim(x)[2] + intercept)
-    #}
-    pos <- 1
-    for (lam in lambda) {
-        return_val[[pos]] <- rq.group.fit(x = x, y = y, groups = groups, 
-            tau = tau, lambda = lam, intercept = intercept, penalty=penalty,alg=alg, 
-            method="br",...)
-        #initial_beta <- return_val[[pos]]$coefficients
-        pos <- pos + 1
-    }
+    if(alg != "QICD_warm"){
+		#don't know how to do warm start with linear programming approach 
+		return_val <- list()
+		pos <- 1
+		for (lam in lambda) {
+			return_val[[pos]] <- rq.group.fit(x = x, y = y, groups = groups, 
+				tau = tau, lambda = lam, intercept = intercept, penalty=penalty,alg=alg, penGroups=penGroups,
+				...)
+			#initial_beta <- return_val[[pos]]$coefficients
+			pos <- pos + 1
+		}
+	} else{
+		p <- dim(x)[2]
+		pos <- 1
+		alg = "QICD"
+		
+		return_val <- list()
+		if(intercept){
+			initial_beta <- c(quantile(y,tau), rep(0,p))
+		} else{
+			initial_beta <- rep(0,p)
+		}
+		
+		for(lam in lambda){
+			return_val[[pos]] <- rq.group.fit(x=x, y=y, groups=groups, tau=tau, lambda= lam, intercept=intercept, penalty="LASSO", alg=alg, initial_beta=initial_beta, penGroups=penGroups, ...)
+			initial_beta <- coefficients(return_val[[pos]])
+			pos <- pos + 1
+		}
+		
+		#if penalty is not lasso then update those initial estimates
+		if(penalty != "LASSO"){
+			pos <- 1
+			for(lam in lambda){
+				initial_beta <- coefficients(return_val[[pos]]) #use lasso estimate as initial estimate
+				return_val[[pos]] <- rq.group.fit(x=x, y=y, groups=groups, tau=tau, lambda= lam, intercept=intercept, penalty=penalty, alg=alg, initial_beta=initial_beta, penGroups=penGroups, ...)
+				pos <- pos + 1
+			}
+		}
+	}
     return_val
 }
 
