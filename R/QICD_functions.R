@@ -90,8 +90,11 @@ QICD <- function(y, x, tau=.5, lambda, intercept=TRUE, penalty="SCAD",
       pentype <- as.integer(2)
   }
 
-  if( is.null(initial_beta) )
-    initial_beta <- LASSO.fit(y, x, tau, lambda, intercept, coef.cutoff)
+  if( is.null(initial_beta) ){
+    # initial_beta <- LASSO.fit(y, x, tau, lambda, intercept, coef.cutoff)
+    initial_beta <- coefficients( cv.rq.pen(x, y, tau=tau, intercept=intercept, 
+                            penalty="LASSO", criteria="BIC") )
+  }
 
   if( intercept ){
     beta <- initial_beta[-1]
@@ -375,6 +378,8 @@ QICD.group <- function(y, x, groups, tau=.5, lambda, intercept=TRUE, penalty="SC
   intval0 <- intval
   residuals <- as.double(y - x%*%beta - intval)
 
+  badValues <- FALSE
+
   while( (i < maxout) & (distance >= eps) ){
 
     for(grps in unique(groups)){
@@ -394,6 +399,15 @@ QICD.group <- function(y, x, groups, tau=.5, lambda, intercept=TRUE, penalty="SC
     distance <- sqrt( sum((beta - beta0)^2) + (intval0 - intval)^2 )
     beta0 <- beta
     intval0 <- intval
+
+    if( max(abs(beta)) > 1e10 ){
+      badValues <- TRUE
+      break
+    }
+  }
+
+  if( badValues ){
+      warning("Some coefficients diverged to infinity (bad results)")    
   }
 
   if(i == maxout & distance > eps){
@@ -500,11 +514,12 @@ LASSO.fit <- function(y, x, tau, lambda, intercept, coef.cutoff, weights=NULL)
   	ynew[1:n]  <-  ynew[1:n] * weights
   }
 
-  if( n + 2*p < 500 ){ ### If problem is small, use "br" method
+  #Ben: had some problems with fnb, setting all to use br for now
+  #if( n + 2*p < 500 ){ ### If problem is small, use "br" method
     out <- shortrq.fit.br(xnew, ynew, tau)
-  } else {             ### Else use "fn" method
-    out <- shortrq.fit.fnb(xnew, ynew, tau)
-  }
+  #} else {             ### Else use "fn" method
+  #  out <- shortrq.fit.fnb(xnew, ynew, tau)
+  #}
 
   out[ abs(out) < coef.cutoff ] <- 0
   return(out)
@@ -528,11 +543,12 @@ LASSO.fit.nonpen <- function(y, x, z, tau, lambda, intercept, coef.cutoff, weigh
   	ynew[1:n]  <-  ynew[1:n] * weights
   }
 
-  if( n + 2*p < 500 ){ ### If problem is small, use "br" method
+  #Ben: had some problems with fnb, setting all to use br for now
+  #if( n + 2*p < 500 ){ ### If problem is small, use "br" method
     out <- shortrq.fit.br(xz, ynew, tau)
-  } else {             ### Else use "fn" method
-    out <- shortrq.fit.fnb(xz, ynew, tau)
-  }
+  #} else {             ### Else use "fn" method
+  #  out <- shortrq.fit.fnb(xz, ynew, tau)
+  #}
 
   out <- out
 
