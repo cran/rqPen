@@ -63,7 +63,7 @@ shortrq.fit.fnb <- function (x, y, tau = 0.5, beta = 0.99995, eps = 1e-06)
 
 QICD <- function(y, x, tau=.5, lambda, intercept=TRUE, penalty="SCAD", 
                  initial_beta=NULL, maxin=100, maxout=20, eps = 1e-05, coef.cutoff=1e-08,  
-                 a=3.7, ...)
+                 a=3.7, scalex=TRUE, ...)
 #y: response variable, length n vector
 #x: input nxp matrix, of dimension nobs x nvars; each row is an observation vector. 
 #tau is the quantile value
@@ -80,6 +80,12 @@ QICD <- function(y, x, tau=.5, lambda, intercept=TRUE, penalty="SCAD",
 ### Should be in the form (intercept, coefficients) intercept should be left out if intercept=FALSE
 {
   cleanInputs(y, x, lambda, initial_beta, intercept, penalty, a)
+  
+  if(scalex){
+	x <- scale(x)
+	mu_x <- attributes(x)$`scaled:center`
+	sigma_x <- attributes(x)$`scaled:scale`
+  }
 
   # Set penalty function
   if(penalty == "SCAD"){
@@ -154,9 +160,12 @@ QICD <- function(y, x, tau=.5, lambda, intercept=TRUE, penalty="SCAD",
 
   beta[ abs(beta) < coef.cutoff ] <- 0
   coefficients <- beta
-  if(intercept)
+  if(intercept){
     coefficients <- c(intval, beta)
-
+  }
+  if(scalex){
+	coefficients <- transform_coefs(coefficients,mu_x,sigma_x,intercept)
+  }
   return( coefficients )
 }
 
@@ -164,7 +173,7 @@ QICD <- function(y, x, tau=.5, lambda, intercept=TRUE, penalty="SCAD",
 
 QICD.nonpen <- function(y, x, z, tau=.5, lambda, intercept=TRUE, penalty="SCAD", 
                  initial_beta=NULL, maxin=100, maxout=20, eps = 1e-05, coef.cutoff=1e-08,  
-                 a=3.7, method="br", ...)
+                 a=3.7, method="br", scalex=TRUE, ...)
 #y: response variable, length n vector
 #x: input nxp matrix, of dimension nobs x nvars; each row is an observation vector.
 #z is nxq matrix of bases; the coefficients for these columns will be unpenalized
@@ -184,8 +193,13 @@ QICD.nonpen <- function(y, x, z, tau=.5, lambda, intercept=TRUE, penalty="SCAD",
 #method for quantile regression: can be "br" or "fn", see top for description.
 {
   cleanInputs(y, x, lambda, initial_beta[ 1:(intercept+ncol(x)) ], intercept, penalty, a)
+  if(scalex){
+	x <- scale(x)
+	mu_x <- attributes(x)$`scaled:center`
+	sigma_x <- attributes(x)$`scaled:scale`
+  }
 
-  if( class(z)!="matrix" ){                                                                                    
+  if(is(z,"matrix") == FALSE ){                                                                                    
     stop('z needs to be a matrix')
   }
 
@@ -297,9 +311,14 @@ QICD.nonpen <- function(y, x, z, tau=.5, lambda, intercept=TRUE, penalty="SCAD",
   }    
 
   beta[ abs(beta) < coef.cutoff ] <- 0
+  if(scalex){
+	beta <- transform_coefs(beta,mu_x,sigma_x,intercept)
+  }
+  
   coefficients <- c(beta, zbeta)
-  if(intercept)
+  if(intercept){
     coefficients <- c(zbeta[1], beta, zbeta[-1])
+  }
 
   return( coefficients )
 }
@@ -312,7 +331,7 @@ QICD.nonpen <- function(y, x, z, tau=.5, lambda, intercept=TRUE, penalty="SCAD",
 
 QICD.group <- function(y, x, groups, tau=.5, lambda, intercept=TRUE, penalty="SCAD", 
                  initial_beta=NULL, maxin=100, maxout=20, eps = 1e-05, coef.cutoff=1e-08,  
-                 a=3.7, ...)
+                 a=3.7, scalex=TRUE, ...)
 #y: response variable, length n vector
 #x: input nxp matrix, of dimension nobs x nvars; each row is an observation vector. 
 #groups: numeric vector of length ncol(x) with the group number of the coefficient (can be unique)
@@ -324,12 +343,19 @@ QICD.group <- function(y, x, groups, tau=.5, lambda, intercept=TRUE, penalty="SC
 #initial_beta: initial value for x-covariates, the default value is NULL (lasso estimates will be used)
 #eps is the convergence threshold for coordinate descent and majorization minimization step
 #penalty is the name of the penalty function ("SCAD", "MCP", "LASSO")
-#a is scale parameter, the default value is 3.7 (>2 for SCAD, >1 for MCP, not used in LASSO)
 #coef.cutoff is threshold for determining nonzero coefficients
 #initial_beta is vector containing initial values for intercept (if included) and coefficients.
+#a is scale parameter, the default value is 3.7 (>2 for SCAD, >1 for MCP, not used in LASSO)
+
 ### Should be in the form (intercept, coefficients) intercept should be left out if intercept=FALSE
 {
   cleanInputs(y, x, lambda, initial_beta, intercept, penalty, a)
+  
+  if(scalex){
+	x <- scale(x)
+	mu_x <- attributes(x)$`scaled:center`
+	sigma_x <- attributes(x)$`scaled:scale`
+  }
 
   # Set penalty function
   if(penalty == "SCAD"){
@@ -416,9 +442,14 @@ QICD.group <- function(y, x, groups, tau=.5, lambda, intercept=TRUE, penalty="SC
 
   beta[ abs(beta) < coef.cutoff ] <- 0
   coefficients <- beta
-  if(intercept)
+  if(intercept){
     coefficients <- c(intval, beta)
-
+  }
+  
+  if(scalex){
+	coefficients <- transform_coefs(coefficients,mu_x,sigma_x,intercept)
+  }
+  
   return( coefficients )
 }
 
@@ -569,7 +600,7 @@ LASSO.fit.nonpen <- function(y, x, z, tau, lambda, intercept, coef.cutoff, weigh
 # Easier to create this function to include in each QICD function
 cleanInputs <- function(y, x, lambda, initial_beta=NULL, intercept=TRUE,
                         penalty, a, ...){
-  if( class(x)!="matrix" ){                                                                                    
+  if( is(x,"matrix") == FALSE){                                                                                    
     stop('x needs to be a matrix')
   }
 
