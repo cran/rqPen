@@ -74,7 +74,7 @@ cv.rq.pen <- function(x,y,tau=.5,lambda=NULL,weights=NULL,penalty="LASSO",interc
   p_range <- penVars + intercept
   n <- dim(x)[1]
   pen_func <- switch(which(c("LASSO","SCAD","MCP")==penalty), lasso, scad, mcp)
-
+ 
   ### QICD ###
   if( alg=="QICD" & penalty!="LASSO" ){
     if(criteria=="CV"){
@@ -502,11 +502,14 @@ getRho <- function(model){
     model$rho
 }
 
-cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "LASSO", 
+cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "SCAD", 
     intercept = TRUE, criteria = "CV", cvFunc = "check", nfolds = 10, 
     foldid = NULL, nlambda = 100, eps = 1e-04, init.lambda = 1,alg="QICD",penGroups=NULL,
     ...) 
 {
+  if(penalty=="LASSO"){
+	warning("Group penalties use the L1 norm and the Lasso group penalty is the same as the standard Lasso penalty and therefore does not account for group structure. The group lasso method is only implemented because it is needed for the SCAD and MCP algorithms. Otherwise it should be avoided. ")
+  }
 	if(is.null(penGroups)){
 		p_range <- 1:dim(x)[2] + intercept
     } else{
@@ -670,7 +673,7 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
 }
 
 rq.group.fit <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE, 
-                penalty = "LASSO", alg="QICD", a=3.7,penGroups=NULL, ...) 
+                penalty = "SCAD", alg="QICD", a=3.7,penGroups=NULL, ...) 
 {
   ### Some cleaning/checking before getting to the algorithms
   p <- ncol(x)
@@ -678,6 +681,9 @@ rq.group.fit <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE,
   #if(is.null(penGroups) & max(penGroups) > max(groups)){ stop("penalize groups not coefficients")}  
   if (!penalty %in% c("LASSO", "SCAD", "MCP")) {
       stop("Penalty must be LASSO, SCAD or MCP")
+  }
+  if(penalty=="LASSO"){
+	warning("Group penalties use the L1 norm and the Lasso group penalty is the same as the standard Lasso penalty and therefore does not account for group structure. The group lasso method is only implemented because it is needed for the SCAD and MCP algorithms. Otherwise it should be avoided. ")
   }
   if(is.null(dim(x))){ stop("x must be matrix with at least 1 column") }
   if(length(groups)!=ncol(x)){
@@ -700,7 +706,7 @@ rq.group.fit <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE,
     if( length(lambda) != 1 )
       stop( "QICD Algorithm only allows 1 lambda value")
 
-    coefs <- QICD.group(y, x, groups, tau, lambda, intercept, penalty, ...)
+    coefs <- QICD.group(y, x, groups, tau, lambda, intercept, penalty,a=a, ...)
 
     ### Add extra information to QICD output
     coefnames <- paste("x",1:p, sep="") ### Coefficient names
@@ -757,7 +763,7 @@ rq.group.fit <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE,
                 "rqLASSO")
         }
         else {
-            return_val <- rq.group.lin.prog(x,y,groups,tau,lambda,intercept=intercept,penalty=penalty,penGroups=penGroups,...)
+            return_val <- rq.group.lin.prog(x,y,groups,tau,lambda,intercept=intercept,penalty=penalty,penGroups=penGroups,a=a,...)
             class(return_val) <- c("rq.group.pen", "rq.pen")
         }
     }
