@@ -1,24 +1,3 @@
-kernel_estimates <- function(x,y,h,...){
-  kernel_estimates <- NULL
-  if(is.null(dim(x))){
-    n <- length(x)
-    d <- 1
-  } else{
-    n <- dim(x)[1]
-    d <- dim(x)[2]
-  }
-  for(i in 1:n){
-     if(d == 1){
-        kernel_estimates <- c(kernel_estimates,kernesti.regr(x[i],x,y,h=h,...))
-     } else{
-        kernel_estimates <- c(kernel_estimates,kernesti.regr(x[i,],x,y,h=h,...))
-     }
-  }
-  kernel_estimates
-}
-
-
-
 model_eval <- function(model, test_x, test_y, test_w=NULL, func="check",...){
 #func: "check" (Quantile Check), "SqErr" (Squared Error), "AE" (Absolute Value)
   if(model$intercept){

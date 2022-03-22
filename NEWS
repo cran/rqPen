@@ -1,3 +1,8 @@
+rqPen 2.3 (Release date: 2021-03-21)
+=============
+Changes:
+* Removed functions kernel_estimates and kernel_weights in order to remove dependency on regpro.
+
 rqPen 2.2.2 (Release date: 2020-04-08)
 =============
 Changes:

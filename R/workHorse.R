@@ -1,16 +1,3 @@
-kernel_weights <- function(obs_data,obs_ind,...){
-   if(is.null(dim(obs_data))){
-      d <- 1
-      n <- length(obs_data)
-   } else{
-      d <- dim(obs_data)[2]
-      n <- dim(obs_data)[1]
-   }
-   tune_h <- sd(obs_data)*n^{-1/(d+2)}
-   kernel_est <- kernel_estimates(obs_data,obs_ind,tune_h,...)
-   1/kernel_est
-}
-
 check <- function(x,tau=.5){
    x*(tau - (x<0))
 }

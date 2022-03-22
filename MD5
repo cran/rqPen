@@ -1,10 +1,10 @@
-db573fdfa67372d3f47f37844aef3273 *DESCRIPTION
+89bfc7e20a3c0964e415174d9a99d624 *DESCRIPTION
 daf0a7dd21c3a3c36d92db415de4c27b *LICENSE
-d870fbbc0666ec4254ebebed495b4c3c *NAMESPACE
-3231c31158ab52a82c175f0e71a9da8f *NEWS
+c004ab0c2fa9b66f01dc4c15b2179167 *NAMESPACE
+eb17f14f1f7997d28bc61e01cdcdd538 *NEWS
 7aeeeb23d0394300bb60974aeb2de91e *R/QICD_functions.R
-61247a5d9e079275b9c3efa6e45a7197 *R/mainFunctions.R
-e89759029557a00c4d88817f60af05f6 *R/workHorse.R
+13f6f42a984f39f136fbaf0353a5ae7c *R/mainFunctions.R
+c3a51f4ab9116c5202274f74fc4da795 *R/workHorse.R
 2b5c2b3d751930ed0fc2b09d95884806 *man/LASSO.fit.Rd
 849e02390801b0bb9053a30a4bc67fab *man/LASSO.fit.nonpen.Rd
 7c44f378e7e3161f1b33dc1396ce7d55 *man/QICD.Rd
@@ -22,8 +22,6 @@ a39f8d95d91037201cbda13dc763cb9a *man/cv_plots.Rd
 3b460a7e370c31715c5a780f8f2c2396 *man/get_coef_pen.Rd
 a3cd208aa83ee81d154d14fa9c877321 *man/groupMultLambda.Rd
 ab7d7115912f6b97ec7ca6a5457d06f9 *man/group_derivs.Rd
-dafed51c6861a3b8be974207eac96aa3 *man/kernel_estimates.Rd
-aa541dd968fa39a315ac2260515ac33f *man/kernel_weights.Rd
 69f90d5abfa30750b753b1c0ccf51139 *man/lasso.Rd
 d330c0a36329d33ebefab1b8ba3f374b *man/mcp.Rd
 b5c315a26e53f825ae88624b828dbea7 *man/mcp_deriv.Rd
