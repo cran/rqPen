@@ -1,7 +1,23 @@
-rqPen 2.3 (Release date: 2021-03-21)
+rqPen 3.0 (Release date: 2022-08-09)
+=============
+Changes:
+* Package now has elastic net penalty, adaptive lasso, group adaptive lasso and group lasso.  
+* New function rq.pen() which should be used for any non-group penalty. 
+* New function rq.group.pen() should should be used for any group penalty. Group penalties now have L2 and L1 composite norms. In other words, using L2 norm with group lasso provides the typial group lasso. Previously only had L1 norm implemented and so group lasso was the same as regular lasso. See help(rq.group.pen) for more details. 
+* New functions rq.pen.cv() and rq.group.pen.cv() which provide cross validation for rq.pen() and rq.group.pen() objects, respectively. 
+* Function qic.select() uses information criterion to select best tuning parameters.
+* All functions allow for multiple values of tau and multiple values of "a", the second tuning parameter.
+* New algorithms implement Huber-type approximations to quantile loss, greatly improving computational efficiency.
+* Started deprecating many functions that were the old way to fit models. Examples include rq.lasso.fit(), rq.nc.fit(), rq.group.fit(), cv.rq.pen() and cv.rq.group.pen. Instead recommend using rq.pen(), rq.group.pen(), rq.pen.cv() and rq.group.pen.cv() 
+* Updated code for get_coef_pen() to a fix a bug where it was returning multiple values. Thank you to Jingyi Kenneth Tay for noticing this issue. 
+* Updated cv.rq.pen() code so that it will check to make sure that the y variable is not in matrix form. Thanks to Haixiang Zhang for providing code where y in matrix form caused problems. 
+ 
+
+rqPen 2.3 (Release date: 2022-03-21)
 =============
 Changes:
 * Removed functions kernel_estimates and kernel_weights in order to remove dependency on regpro.
+
 
 rqPen 2.2.2 (Release date: 2020-04-08)
 =============
@@ -26,7 +42,7 @@ Changes:
 * Fixed bug in the lp algorithm for group penalties.
 * Switched from using fnb to br algorithm as the default for big data problems.
 * Updated rq.lasso.fit to give an error message if only one predictor is provided. 
-* Updated cross-validation to correctly use weights. 
+* Updated cross-validation to correctly use weights. Thanks to Benda Xu for finding this bug. 
 * Made changes to improve performance of QICD algorithm.
 * Updated cv.rq.pen to work with QICD algorithm. 
 
@@ -86,3 +102,4 @@ Changes:
 
 rqPen 1.0 (Release date: 2014-10-29)
 ==============
+* First submission. 
