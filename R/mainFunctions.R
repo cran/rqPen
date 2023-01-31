@@ -419,6 +419,9 @@ rq.pen <- function(x,y,tau=.5,lambda=NULL,penalty=c("LASSO","Ridge","ENet","aLAS
 	coef.cutoff=1e-8,max.iter=10000,converge.eps=1e-7,lambda.discard=TRUE,...){
 	penalty <- match.arg(penalty)
 	alg <- match.arg(alg)
+	if(is.matrix(y)==TRUE){
+		y <- as.numeric(y)
+	}
 	if(min(penalty.factor) < 0 | min(tau.penalty.factor) < 0){
 		stop("Penalty factors must be non-negative.")
 	}
@@ -613,7 +616,7 @@ predict.rq.pen.seq <- function(object, newx,tau=NULL,a=NULL,lambda=NULL,modelsIn
 #' # uses median cross-validation error instead of mean.
 #' r4 <- rq.pen.cv(x,y,cvSummary=median)  
 #'#Cross-validation with no penalty on the first variable.
-#' r5 <- rq.pen.cv(x,y,penalty.factor=c(1,rep(0,7)))
+#' r5 <- rq.pen.cv(x,y,penalty.factor=c(0,rep(1,7)))
 #' }
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu}
 rq.pen.cv <- function(x,y,tau=.5,lambda=NULL,penalty=c("LASSO","Ridge","ENet","aLASSO","SCAD","MCP"),a=NULL,cvFunc=NULL,nfolds=10,foldid=NULL,nlambda=100,groupError=TRUE,cvSummary=mean,tauWeights=rep(1,length(tau)),printProgress=FALSE,...){
@@ -2399,6 +2402,9 @@ rq.group.pen <- function(x,y, tau=.5,groups=1:ncol(x), penalty=c("gLASSO","gAdLA
 	}
 	if(g==p){
 		warning("p groups for p predictors, not really using a group penalty")
+	}
+	if(is.matrix(y)==TRUE){
+		y <- as.numeric(y)
 	}
 	penalty <- match.arg(penalty)
 	alg <- match.arg(alg)
