@@ -655,7 +655,11 @@ rq.group.lla <- function(obj,x,y,groups,penalty=c("gAdLASSO","gSCAD","gMCP"),a=N
 
 updateGroupPenRho <- function(obj,norm,groups,group.pen.factor,tau.penalty.factor){
 #code improvement: double for loop 
-  min_n_coefs <- min(sapply(lapply(obj$models,coefficients),ncol))
+	if(length(obj$lambda)==1){
+		min_n_coefs <- 1
+	} else{  
+		min_n_coefs <- min(sapply(lapply(obj$models,coefficients),ncol))
+	}
 	obj$lambda <- obj$lambda[1:min_n_coefs]
 	for(j in 1:length(obj$models)){
 		a <- obj$models[[j]]$a
@@ -663,7 +667,11 @@ updateGroupPenRho <- function(obj,norm,groups,group.pen.factor,tau.penalty.facto
 		obj$models[[j]]$rho <- obj$models[[j]]$rho[1:min_n_coefs]
 		obj$models[[j]]$PenRho <- obj$models[[j]]$PenRho[1:min_n_coefs]
 		obj$models[[j]]$nzero <- obj$models[[j]]$nzero[1:min_n_coefs]
-		obj$models[[j]]$coefficients <- obj$models[[j]]$coefficients[,1:min_n_coefs]
+		if(min_n_coefs ==1 ){
+			obj$models[[j]]$coefficients <- obj$models[[j]]$coefficients
+		} else{
+			obj$models[[j]]$coefficients <- obj$models[[j]]$coefficients[,1:min_n_coefs]
+		}
 		if(length(obj$models[[j]]$rho)==1){
 			obj$models[[j]]$PenRho <- obj$models[[j]]$rho + sum(getGroupPen(obj$models[[j]]$coefficients[-1],groups,obj$lambda,group.pen.factor*tau.penalty.factor[taupos],obj$penalty,norm,a)) 
 		} 
@@ -866,7 +874,9 @@ rq.pen.modelreturn <- function(coefs,x,y,tau,lambda,local.penalty.factor,penalty
 # for loop that could be removed
 	penfunc <- getPenfunc(penalty)
 	return_val <- NULL
-	colnames(coefs) <- paste0("L",1:ncol(coefs))
+	if(is.null(ncol(coefs))==FALSE){
+		colnames(coefs) <- paste0("L",1:ncol(coefs))
+	}
 	return_val$coefficients <- coefs
 	#return_val$penalty.factor <- penalty.factor
 	p <- ncol(x)
@@ -1222,25 +1232,34 @@ byTauResults <- function(cvErr,tauvals,avals,models,se,lambda){
 	btr
 }
 
-groupTauResults <- function(cvErr, tauvals,a,avals,models,tauWeights,lambda){
+groupTauResults <- function(cvErr, tauvals,a,avals,models,tauWeights,lambda,stdErr){
 # improve note: maybe code in for loop could be improved upon by checking at each iteration if the better cv value has been found or not
 	nl <- length(lambda)
 	na <- length(a)
 	gcve <- matrix(rep(0,na*nl),ncol=nl)
+	gcse <- matrix(rep(0,na*nl),ncol=nl)
 	for(i in 1:na){
 		subErr <- subset(cvErr, avals==a[i])
+		subSe <- subset(stdErr, avals==a[i])
 		gcve[i,] <- tauWeights %*% subErr
+		gcse[i,] <- sqrt( tauWeights^2 %*% subSe^2)
 	}
 	rownames(gcve) <- paste0("a",a)
 	minIndex <- which(gcve==min(gcve),arr.ind=TRUE)
+	minSe <- gcse[minIndex]
 	returnA <- a[minIndex[1]]
 	modelIndex <- which(avals==returnA)
 	targetModels <- models[modelIndex]
 	tauvals <- sapply(targetModels,modelTau)
 	lambdavals <- lambda[minIndex[1,2]]
 	nz <- sapply(targetModels, modelNz, minIndex[1,2])
-	minCv <- cvErr[modelIndex,minIndex[1,2]]
-	list(returnTable=data.table(tau=tauvals,lambda=lambdavals,a=returnA,minCv=minCv,lambdaIndex=minIndex[1,2],modelsIndex=modelIndex, nonzero=nz),gcve=gcve)
+	minCv <- min(gcve)#cvErr[modelIndex,minIndex[1,2]]
+	se1Above <- minCv + minSe
+	se1Spot <- which(gcve[minIndex[1],] <= se1Above)[1]
+	se1nz <- sapply(targetModels, modelNz, se1Spot)
+	lambda1se <- lambda[se1Spot]
+	
+	list(returnTable=data.table(tau=tauvals,minCv=minCv,lambda=lambdavals,lambdaIndex=minIndex[1,2],lambda1se=lambda1se,lambda1seIndex=se1Spot,a=returnA,cvse=minSe,modelsIndex=modelIndex, nonzero=nz, nzse=se1nz),gcve=gcve)
 }
 
 re_order_nonpen_coefs <- function(nonpen_coefs, penVars, intercept=TRUE){
@@ -1291,6 +1310,16 @@ getModels <- function(x,tau=NULL,a=NULL,lambda=NULL,modelsIndex=NULL,lambdaIndex
 	list(targetModels=targetModels,lambdaIndex=lambdaIndex,modelsIndex=modelsIndex)
 }
 
+error.bars <- function (x, upper, lower, width = 0.02, ...) 
+{
+    xlim <- range(x)
+    barw <- diff(xlim) * width
+    segments(x, upper, x, lower, ...)
+    segments(x - barw, upper, x + barw, upper, ...)
+    segments(x - barw, lower, x + barw, lower, ...)
+    range(upper, lower)
+}
+
 
 plotgroup.rq.pen.seq.cv <- function(x,logLambda,main,...){
 	a <- x$fit$a
@@ -1319,19 +1348,6 @@ plotgroup.rq.pen.seq.cv <- function(x,logLambda,main,...){
 	if(na > 1){
 		legend("topleft",paste("a=",a),col=1:na,pch=1)
 	}
-}
-
-
-
-
-error.bars <- function (x, upper, lower, width = 0.02, ...) 
-{
-    xlim <- range(x)
-    barw <- diff(xlim) * width
-    segments(x, upper, x, lower, ...)
-    segments(x - barw, upper, x + barw, upper, ...)
-    segments(x - barw, lower, x + barw, lower, ...)
-    range(upper, lower)
 }
 
 plotsep.rq.pen.seq.cv <- function(x,tau,logLambda,main,...){
