@@ -2,7 +2,7 @@
 % Please edit documentation in R/mainFunctions.R
 \name{qic}
 \alias{qic}
-\title{Calculate information criterion for penalized quantile regression models}
+\title{Calculate information criterion for penalized quantile regression models. Currently not exported.}
 \usage{
 qic(model, n, method = c("BIC", "AIC", "PBIC"))
 }
@@ -20,9 +20,10 @@ for BIC \eqn{b=log(n)} and for PBIC \eqn{d=log(n)*log(p)} where p is the dimensi
 for every value of \eqn{\lambda}.
 }
 \description{
-Calculate information criterion for penalized quantile regression models
+Calculate information criterion for penalized quantile regression models. Currently not exported.
 }
 \examples{
+\dontrun{
 set.seed(1)
 x <- matrix(runif(800),ncol=8)
 y <- 1 + x[,1] + x[,8] + (1+.5*x[,3])*rnorm(100)
@@ -30,7 +31,8 @@ m1 <- rq.pen(x,y,tau=c(.25,.75))
 # returns the IC values for tau=.25
 qic(m1$models[[1]],m1$n) 
 # returns the IC values for tau=.75
-qic(m1$models[[2]],m1$n) 
+qic(m1$models[[2]],m1$n)
+} 
 }
 \references{
 \insertRef{qrbic}{rqPen}
@@ -38,3 +40,4 @@ qic(m1$models[[2]],m1$n)
 \author{
 Ben Sherwood, \email{ben.sherwood@ku.edu}
 }
+\keyword{internal}

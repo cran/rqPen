@@ -4,7 +4,14 @@
 \alias{bytau.plot.rq.pen.seq.cv}
 \title{Plot of coefficients varying by quantiles for rq.pen.seq.cv object}
 \usage{
-\method{bytau.plot}{rq.pen.seq.cv}(x, septau = TRUE, cvmin = TRUE, useDefaults = TRUE, ...)
+\method{bytau.plot}{rq.pen.seq.cv}(
+  x,
+  septau = TRUE,
+  cvmin = TRUE,
+  useDefaults = TRUE,
+  vars = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{An rq.pen.seq.cv object}
@@ -15,7 +22,9 @@
 
 \item{useDefaults}{Set to FALSE if you want to use something besides minimum cv or 1se.}
 
-\item{...}{Additional parameters sent to plot()}
+\item{vars}{Index of the variables to plot with 1 being the intercept, 2 being the first predictor, etc. Default is to include all variables.}
+
+\item{...}{Additional parameters sent to coef()}
 }
 \value{
 Returns plots of coefficient estimates varying by quantile.

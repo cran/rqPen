@@ -4,7 +4,7 @@
 \alias{bytau.plot.rq.pen.seq}
 \title{Plot of how coefficients change with tau.}
 \usage{
-\method{bytau.plot}{rq.pen.seq}(x, a = NULL, lambda = NULL, lambdaIndex = NULL, ...)
+\method{bytau.plot}{rq.pen.seq}(x, a = NULL, lambda = NULL, lambdaIndex = NULL, vars = NULL, ...)
 }
 \arguments{
 \item{x}{An rq.pen.seq object}
@@ -15,7 +15,9 @@
 
 \item{lambdaIndex}{The lambda index of interest. Only specify lambdaIndex or lambda, not both.}
 
-\item{...}{Additional parameters sent to plot()}
+\item{vars}{Index of the variables to plot with 1 being the intercept, 2 being the first predictor, etc. Default is to include all variables.}
+
+\item{...}{Additional parameters sent to coef()}
 }
 \value{
 A plot of coefficient values by tau.

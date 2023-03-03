@@ -501,7 +501,13 @@ rq.lla <- function(obj,x,y,penalty,a=ifelse(penalty=="SCAD",3.7,3),penalty.facto
 				llapenf <- derivf(as.numeric(abs(coefficients(obj$models[[j]]))[-1,i]),lampen*obj$lambda[i],a=a[k])
 				if(sum(llapenf)==0){
 					if(!endHit){
-						update_est <- coefficients(rq(y~x,tau=obj$tau[j]))
+						update_est <- try(coefficients(rq(y~x,tau=obj$tau[j])),silent=TRUE)
+						if(inherits(update_est,"try-error")){
+							warning(paste0("At lambda value ", obj$lambda[i], " method is equivalent to an unpenalized method but quantreg:::rq(y~x) fails at quantile", obj$tau[j], ". Thus method stops at lambda", obj$lambda[i-1]))
+							i <- i -1
+							update_est <- newModels[[pos]]$coefficients[,i] # bad code alert. Hack to get out of this situation where rq doesn't work
+							penSums <- penSums[-length(penSums)]
+						}
 						endHit <- TRUE
 					}
 				}
@@ -579,12 +585,17 @@ rq.group.lla <- function(obj,x,y,groups,penalty=c("gAdLASSO","gSCAD","gMCP"),a=N
 			endHit <- FALSE
 			penVals <- NULL
 			for(i in 1:ll){	
-			 # print(paste("j val", j, "k val", k, "i val", i))
+			  #print(paste("j val", j, "k val", k, "i val", i))
 				coef_by_group_deriv <- group_derivs(derivf, groups, abs(coefficients(obj$models[[j]])[-1,i]),lampen[,i],a[k],norm=norm)
 				#print(paste("derivs are ", coef_by_group_deriv))
 				if(sum(coef_by_group_deriv)==0){
 					if(n > p + 1){
-						update_est <- coefficients(rq(y~x,tau=obj$tau[j]))
+						update_est <- try(coefficients(rq(y~x,tau=obj$tau[j])), silent=TRUE)
+						if(inherits(update_est,"try-error")){
+						  warning(paste0("At lambda value ", obj$lambda[i], " method is equivalent to an unpenalized method but quantreg:::rq(y~x) fails at quantile", obj$tau[j], ". Thus method stops at lambda", obj$lambda[i-1]))
+						  i <- i -1
+						  update_est <- newModels[[pos]]$coefficients[,i] # bad code alert. Hack to get out of this situation where rq doesn't work
+						}
 						endHit <- TRUE
 					} else{
 						if(lambda.discard){
@@ -778,7 +789,7 @@ rq.nc <- function(x, y, tau=.5,  penalty=c("SCAD","aLASSO","MCP"),a=NULL,lambda=
 			}
 		}
 		names(models) <- modelNames
-		returnVal <- list(models=models, n=n, p=p,alg=alg,tau=tau,lambda=lambda,penalty.factor=rep(1,p),penalty=penalty,a=a)		
+		returnVal <- list(models=models, n=n, p=p,alg=alg,tau=tau,lambda=lambda,penalty.factor=penalty.factor,penalty=penalty,a=a)		
 		returnVal$modelsInfo <- createModelsInfo(models)
 		class(returnVal) <- "rq.pen.seq"
 		returnVal
@@ -1338,15 +1349,27 @@ plotgroup.rq.pen.seq.cv <- function(x,logLambda,main,...){
 	if(is.null(main)){
 		main <- "Cross validation results summarized for all tau"
 	}
+	
 	maxerr <- max(x$gcve)
-	plot(lambdas, x$gcve[1,],ylab="Cross Validation Error",ylim=c(0,maxerr),xlab=xtext,type="n",main=main,...)
-	for(i in 1:na){
-		points(lambdas,x$gcve[i,],col=i,pch=1)
-	}
 	bestlamidx <- x$gtr$lambdaIndex[1]
-	lines(rep(lambdas[bestlamidx],2),c(-5,maxerr+5),lty=2)
+	se1lamidx <- x$gtr$lambda1seIndex[1]
+	gse <- x$gtr$cvse[1]
+	minrow <- which(x$gcve==min(x$gcve),arr.ind=TRUE)[1]
+	besterr <- x$gcve[minrow,]
+	
+	plot(lambdas, x$gcve[1,],ylab="Cross Validation Error",ylim=c(min(c(x$gcve,besterr-gse)),max(c(maxerr,besterr+gse))),xlab=xtext,type="n",main=main,...)
+	for(i in 1:na){
+		points(lambdas,x$gcve[i,],col=i,pch=20)
+	}
+	
+	lines(rep(lambdas[bestlamidx],2),c(-5,maxerr+gse+5),lty=2)
+	lines(rep(lambdas[se1lamidx],2),c(-5,maxerr+gse+5),lty=2)
+	
+	segments(lambdas,besterr-gse,lambdas,besterr+gse)
+	segments(lambdas-.01,besterr-gse,lambdas+.01,besterr-gse)
+	segments(lambdas-.01,besterr+gse,lambdas+.01,besterr+gse)
 	if(na > 1){
-		legend("topleft",paste("a=",a),col=1:na,pch=1)
+		legend("bottomright",paste("a=",a),col=1:na,pch=1,inset=c(0,1),xpd=TRUE,horiz=TRUE,bty="n")
 	}
 }
 
@@ -1356,6 +1379,7 @@ plotsep.rq.pen.seq.cv <- function(x,tau,logLambda,main,...){
 	}
 	keepers <- which(closeEnough(tau,x$fit$modelsInfo$tau))
 	minfo <- x$fit$modelsInfo[keepers,]
+	merr <- x$cverr[keepers,]
 	avals <- unique(minfo$a)
 	na <- length(avals)
 	nt <- length(tau)
@@ -1382,7 +1406,11 @@ plotsep.rq.pen.seq.cv <- function(x,tau,logLambda,main,...){
 		}
 		subkeepers <- which(closeEnough(tau[i],minfo$tau))
 		subinfo <- minfo[subkeepers,]
-		suberr <- x$cverr[subkeepers,]
+		if(is.null(dim(merr))){
+		  suberr <- merr  
+		} else{
+		  suberr <- merr[subkeepers,]
+		}
 		
 		bestkeep <- which(closeEnough(tau[i],x$btr$tau))
 		subbtr <- x$btr[bestkeep,]
@@ -1390,11 +1418,11 @@ plotsep.rq.pen.seq.cv <- function(x,tau,logLambda,main,...){
 		cvsd <- x$cvse[subbtr$modelsIndex,]
 		
 		if(is.null(dim(suberr))){
-			plot(lambdas,suberr,ylim=c(0,max(max(suberr),max(besterr+cvsd))),ylab="Cross Validation Error", xlab=xtext,main=mainText,...) 
+			plot(lambdas,suberr,ylim=c(min(min(suberr),min(besterr-cvsd)),max(max(suberr),max(besterr+cvsd))),ylab="Cross Validation Error", xlab=xtext,main=mainText,...) 
 		} else{
-			plot(lambdas,suberr[1,],ylim=c(0,max(max(suberr),max(besterr+cvsd))),ylab="Cross Validation Error", xlab=xtext,main=mainText,type="n",...)
+			plot(lambdas,suberr[1,],ylim=c(min(min(suberr),min(besterr-cvsd)),max(max(suberr),max(besterr+cvsd))),ylab="Cross Validation Error", xlab=xtext,main=mainText,type="n",...)
 			for(j in 1:na){
-				points(lambdas,suberr[j,],col=j)
+				points(lambdas,suberr[j,],col=j,pch=20)
 			}
 		}
 		#then get index and plot error bars for this. 
@@ -1403,7 +1431,7 @@ plotsep.rq.pen.seq.cv <- function(x,tau,logLambda,main,...){
 		segments(lambdas-.01,besterr-cvsd,lambdas+.01,besterr-cvsd)
 		segments(lambdas-.01,besterr+cvsd,lambdas+.01,besterr+cvsd)
 		if(na>1){
-			legend("topleft",paste("a=",subinfo$a),col=1:na,pch=1)
+			legend("bottomright",paste("a=",subinfo$a),col=1:na,pch=20,inset=c(0,1),xpd=TRUE,horiz=TRUE,bty="n")
 		}
 		lidx <- subbtr$lambdaIndex
 		lidxse <- subbtr$lambda1seIndex

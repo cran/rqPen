@@ -1,4 +1,4 @@
-#' Calculate information criterion for penalized quantile regression models
+#' Calculate information criterion for penalized quantile regression models. Currently not exported. 
 #'
 #' @param model model from a rq.pen.seq() object
 #' @param n Sample size
@@ -9,9 +9,8 @@
 #' \deqn{\log(\sum_{i=1}^n \rho_\tau(y_i-x_i^\top\hat{\beta})) + d*b/(2n),} where d is the number of nonzero coefficients and b depends on the method used. For AIC \eqn{b=2},
 #' for BIC \eqn{b=log(n)} and for PBIC \eqn{d=log(n)*log(p)} where p is the dimension of \eqn{\hat{\beta}}. Returns this value for each coefficient vector in the model, so one
 #' for every value of \eqn{\lambda}. 
-#' @export
-#'
-#' @examples
+#' @keywords internal
+#' @examples \dontrun{
 #' set.seed(1)
 #' x <- matrix(runif(800),ncol=8)
 #' y <- 1 + x[,1] + x[,8] + (1+.5*x[,3])*rnorm(100)
@@ -19,7 +18,8 @@
 #' # returns the IC values for tau=.25
 #' qic(m1$models[[1]],m1$n) 
 #' # returns the IC values for tau=.75
-#' qic(m1$models[[2]],m1$n) 
+#' qic(m1$models[[2]],m1$n)
+#' } 
 #' @references 
 #' \insertRef{qrbic}{rqPen}
 #'@author Ben Sherwood, \email{ben.sherwood@ku.edu}
@@ -124,6 +124,7 @@ qic.select.rq.pen.seq <- function(obj, method=c("BIC","AIC","PBIC"),septau=TRUE,
 		for(i in 1:nt){
 			coefs[,i] <- coef(obj$models[[modelsInfo$modelIndex[i]]])[,modelsInfo$lambdaIndex[i]]
 		}
+		rownames(coefs) <- names(coef(obj$models[[modelsInfo$modelIndex[i]]])[,modelsInfo$lambdaIndex[i]])
 		gic <- NULL
 	} else{
 		gic <- matrix(rep(0,na*nl),ncol=nl)
@@ -217,6 +218,7 @@ qic.select.rq.pen.seq.cv <- function(obj, method=c("BIC","AIC","PBIC"),septau=TR
     for(i in 1:nt){
       coefs[,i] <- coef(obj$models[[modelsInfo$modelIndex[i]]])[,modelsInfo$lambdaIndex[i]]
     }
+	rownames(coefs) <- names(coef(obj$models[[modelsInfo$modelIndex[i]]])[,modelsInfo$lambdaIndex[i]])
     gic <- NULL
   } else{
     gic <- matrix(rep(0,na*nl),ncol=nl)
@@ -276,8 +278,11 @@ print.qic.select <- function(x,...){
 #' preds <- predict(q1,newx)
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu}
 predict.qic.select <- function(object, newdata, ...){
-	#coefs <- do.call(cbind,coefficients(object))
-	cbind(1,newdata) %*% coefficients(object)
+	if(is.null(dim(newdata))){
+	  c(1,newdata) %*% coefficients(object)
+	} else{
+	  cbind(1,newdata) %*% coefficients(object)
+	}
 }
 
 
@@ -473,6 +478,12 @@ rq.pen <- function(x,y,tau=.5,lambda=NULL,penalty=c("LASSO","Ridge","ENet","aLAS
 	# but that seems unnecessarliy complicated right now. 
 		lmin <- min(sapply(fit$models,lambdanum))
 		fit$lambda <- fit$lambda[1:lmin]
+		for(j in 1:length(fit$models)){
+			fit$models[[j]]$coefficients <- fit$models[[j]]$coefficients[,1:lmin]
+			fit$models[[j]]$rho <- fit$models[[j]]$rho[1:lmin]
+			fit$models[[j]]$PenRho <- fit$models[[j]]$PenRho[1:lmin]
+			fit$models[[j]]$nzero <- fit$models[[j]]$nzero[1:lmin]
+		}
 	}
 	fit$call <- match.call()
 	fit
@@ -537,7 +548,11 @@ coef.rq.pen.seq <- function(object,tau=NULL,a=NULL,lambda=NULL,modelsIndex=NULL,
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu}
 predict.rq.pen.seq.cv <- function(object, newx,tau=NULL,septau=TRUE,cvmin=TRUE,useDefaults=TRUE,...){
   coefs <- coefficients(object,septau=septau,cvmin=cvmin,useDefaults=useDefaults,tau=tau,...)
-  cbind(1,newx) %*% coefs
+  if(is.null(dim(newx))){
+    c(1,newx) %*% coefs  
+  } else{
+    cbind(1,newx) %*% coefs
+  }
 }
 
 #' Predictions from rq.pen.seq object
@@ -567,7 +582,11 @@ predict.rq.pen.seq.cv <- function(object, newx,tau=NULL,septau=TRUE,cvmin=TRUE,u
 predict.rq.pen.seq <- function(object, newx,tau=NULL,a=NULL,lambda=NULL,modelsIndex=NULL,lambdaIndex=NULL,...){
   coefs <- coefficients(object,tau,a,lambda,modelsIndex,lambdaIndex,...)
   #lapply(coefs, quick.predict,newx=newx)
-  cbind(1,newx) %*% coefs
+  if(is.null(dim(newx))){
+    c(1,newx) %*% coefs
+  } else{
+    cbind(1,newx) %*% coefs
+  }
 }
 
 #' Does k-folds cross validation for rq.pen. If multiple values of a are specified then does a grid based search for best value of \eqn{\lambda} and a.
@@ -758,6 +777,7 @@ coef.rq.pen.seq.cv <- function(object,septau=TRUE,cvmin=TRUE,useDefaults=TRUE,ta
       }
       nm <- length(models)
       returnVal <- matrix(0,nrow=nrow(coef(object$fit)),ncol=nm)  #vector(mode="list", length=length(models))
+      rownames(returnVal) <- rownames(coef(object$fit))
       colnames(returnVal) <- names(models)
       for(i in 1:nm){
         returnVal[,i] <- coef(object$fit,modelsIndex=btr$modelsIndex[i],lambdaIndex=lambdaIndex[i])
@@ -990,7 +1010,7 @@ rq.group.pen.cv <- function(x,y,tau=.5,groups=1:ncol(x),lambda=NULL,a=NULL,cvFun
 #' \item{penalty}{Penalty selected.}
 #' }
 #' 
-#' @export
+#' @keywords internal
 #'
 #' @examples
 #' \dontrun{
@@ -1298,12 +1318,14 @@ cv.rq.pen <- function(x,y,tau=.5,lambda=NULL,weights=NULL,penalty="LASSO",interc
 #' \item{penalty}{ Penalty used, SCAD or MCP.} 
 #' \item{penalty}{Penalty selected.}
 #' }
-#' @export
+#' 
+#' @keywords internal
 #'
-#' @examples
+#' @examples \dontrun{
 #' x <- matrix(rnorm(800),nrow=100)
 #' y <- 1 + x[,1] - 3*x[,5] + rnorm(100)
 #' scadModel <- rq.nc.fit(x,y,lambda=1)
+#' }
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu} and Adam Maidman. 
 #' @references 
 #' \itemize{
@@ -1464,7 +1486,7 @@ rq.nc.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,
 #' plot(m1)
 #' plot(m1,septau=FALSE)
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu} 
-plot.rq.pen.seq.cv <- function(x,septau=TRUE,tau=NULL,logLambda=FALSE,main=NULL,...){
+plot.rq.pen.seq.cv <- function(x,septau=TRUE,tau=NULL,logLambda=TRUE,main=NULL,...){
 	if(septau){
 		plotsep.rq.pen.seq.cv(x,tau,logLambda,main,...)
 	} else{
@@ -1560,7 +1582,8 @@ plot.rq.pen.seq <- function(x,vars=NULL,logLambda=TRUE,tau=NULL,a=NULL,lambda=NU
 #' @description Warning: this function is no longer exported.  
 #'
 #' @return Plot of how beta estimates change with lambda.
-#' @export
+#' 
+#' @keywords internal
 #'
 #' @examples
 #' \dontrun{
@@ -1622,8 +1645,9 @@ bytau.plot <- function(x,...){
 #' @param x An rq.pen.seq object
 #' @param a The tuning parameter a of interest
 #' @param lambda The lambda value of interest. 
-#' @param lambdaIndex The lambda index of interest. Only specify lambdaIndex or lambda, not both. 
-#' @param ... Additional parameters sent to plot()
+#' @param lambdaIndex The lambda index of interest. Only specify lambdaIndex or lambda, not both.
+#' @param vars Index of the variables to plot with 1 being the intercept, 2 being the first predictor, etc. Default is to include all variables. 
+#' @param ... Additional parameters sent to coef()
 #'
 #' @return A plot of coefficient values by tau. 
 #' @export
@@ -1635,7 +1659,7 @@ bytau.plot <- function(x,...){
 #'   lassoModels <- rq.pen(x,y,tau=seq(.1,.9,.1))
 #'   bytau.plot(lassoModels,lambda=lassoModels$lambda[5])
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu} 
-bytau.plot.rq.pen.seq <- function(x,a=NULL,lambda=NULL,lambdaIndex=NULL,...){
+bytau.plot.rq.pen.seq <- function(x,a=NULL,lambda=NULL,lambdaIndex=NULL,vars=NULL,...){
 	if(is.null(a) & length(x$a)>1){
 		stop("Need to specify value for a")
 	} else if(is.null(a)){
@@ -1653,15 +1677,20 @@ bytau.plot.rq.pen.seq <- function(x,a=NULL,lambda=NULL,lambdaIndex=NULL,...){
 	if(length(lambdaIndex)>1){
 		stop("Function only supports a single value of lambda or lambdaIndex")
 	}
-	coefs <- coefficients(x,a=a,lambdaIndex=lambdaIndex)
-	par(ask=TRUE)
-	p <- ncol(coefs)
+	coefs <- coefficients(x,a=a,lambdaIndex=lambdaIndex,...)
+	if(is.null(vars)){
+	  pindex <- 1:nrow(coefs)
+	} else{
+	  pindex <- vars
+	}
+	lp <- length(pindex)
+	if(lp > 1){	par(ask=TRUE) }
 	tau <- x$tau
-	for(i in 1:p){
-		plot(tau,coefs[i,],xlab=expression(tau),ylab="Coefficient",main=rownames(coefs)[i],pch=16,...)
+	for(i in pindex){
+		plot(tau,coefs[i,],xlab=expression(tau),ylab="Coefficient",main=rownames(coefs)[i],pch=16)
 		lines(tau,coefs[i,])
 	}
-	par(ask=FALSE)
+	if(lp > 1){	par(ask=FALSE) }
 }
 
 #' Plot of coefficients varying by quantiles for rq.pen.seq.cv object
@@ -1670,7 +1699,8 @@ bytau.plot.rq.pen.seq <- function(x,a=NULL,lambda=NULL,lambdaIndex=NULL,...){
 #' @param septau Whether optimal tuning parameters are estimated separately for each quantile.
 #' @param cvmin Whether the minimum cv error should be used or the one standard error rule. 
 #' @param useDefaults Set to FALSE if you want to use something besides minimum cv or 1se. 
-#' @param ... Additional parameters sent to plot() 
+#' @param vars Index of the variables to plot with 1 being the intercept, 2 being the first predictor, etc. Default is to include all variables. 
+#' @param ... Additional parameters sent to coef() 
 #' 
 #' @description Produces plots of how coefficient estimates vary by quantile for models selected by using cross validation.
 #'
@@ -1684,21 +1714,27 @@ bytau.plot.rq.pen.seq <- function(x,a=NULL,lambda=NULL,lambdaIndex=NULL,...){
 #'  lmcv <- rq.pen.cv(x,y,tau=seq(.1,.9,.1))
 #'  bytau.plot(lmcv)
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu} 
-bytau.plot.rq.pen.seq.cv <- function(x,septau=TRUE,cvmin=TRUE,useDefaults=TRUE,...){
-	coefs <- coefficients(x,septau,cvmin,TRUE,tau=x$fit$tau)
+bytau.plot.rq.pen.seq.cv <- function(x,septau=TRUE,cvmin=TRUE,useDefaults=TRUE,vars=NULL,...){
+	coefs <- coefficients(x,septau,cvmin,useDefaults,tau=x$fit$tau,...)
 	if(ncol(coefs) != length(x$fit$tau)){
 		stop("Too many coefficients returned, function only works with one lambda value")
 	}
-	par(ask=TRUE)
-	p <- ncol(coefs)
+	if(is.null(vars)){
+	  pindex <- 1:nrow(coefs)
+	} else{
+	  pindex <- vars
+	}
+	lp <- length(pindex)
+	if(lp > 1){	par(ask=TRUE) }
 	tau <- x$fit$tau
-	for(i in 1:p){
-		plot(tau,coefs[i,],xlab=expression(tau),ylab=paste("Coefficient",i),main=rownames(coefs)[i],pch=16,...)
+	for(i in pindex){
+		plot(tau,coefs[i,],xlab=expression(tau),ylab=paste("Coefficient estimate"),main=rownames(coefs)[i],pch=16)
 		lines(tau,coefs[i,])
 	}
-	par(ask=FALSE)
-	
+	if(lp > 1){	par(ask=FALSE) }
 }
+
+
 
 
 #' Plots of cross validation results as a function of lambda. 
@@ -1709,7 +1745,6 @@ bytau.plot.rq.pen.seq.cv <- function(x,septau=TRUE,cvmin=TRUE,useDefaults=TRUE,.
 #' @param ... Additional parameters sent to plot function.
 #'
 #' @return returns a cross validation plot
-#' @export
 #'
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu} 
 cv_plots <- function(model,logLambda=TRUE,loi=NULL,...){
@@ -1762,6 +1797,8 @@ cv_plots <- function(model,logLambda=TRUE,loi=NULL,...){
 #' \item{groups}{Group structure for penalty function.}
 #' }
 #' 
+#' @keywords internal
+#' 
 #' @examples 
 #' \dontrun{
 #' x <- matrix(rnorm(800),nrow=100)
@@ -1773,7 +1810,6 @@ cv_plots <- function(model,logLambda=TRUE,loi=NULL,...){
 #' \item Yuan, M. and Lin, Y. (2006). Model selection and estimation in regression with grouped variables. \emph{J. R. Statist. Soc. B}, \bold{68}, 49-67.
 #' \item Peng, B. and Wang, L. (2015). An Iterative Coordinate Descent Algorithm for High-Dimensional Nonconvex Penalized Quantile Regression. \emph{Journal of Computational and Graphical Statistics}, \bold{24}, 676-694.
 #' }
-#' @export
 #'
 cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "SCAD", 
     intercept = TRUE, criteria = "CV", cvFunc = "check", nfolds = 10, 
@@ -1975,7 +2011,6 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
 #' As a result of this the group lasso penalty is the same as the typical lasso penalty and thus you should only use a SCAD or MCP penalty. 
 #' Only the SCAD and MCP penalties incorporate the group structure into the penalty. The group lasso penalty is implemented because it is 
 #' needed for the SCAD and MCP algorithm. We use a group penalty extension of the QICD algorithm presented by Peng and Wang (2015). 
-#' @export
 #' 
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu} and Adam Maidman
 #' 
@@ -2089,7 +2124,6 @@ rq.group.fit <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE,
 #' @param ... Additional parameters for plot function.
 #'
 #' @return A cross validation plot. 
-#' @export
 #'
 plot.cv.rq.group.pen <- function (x,...) 
 {
@@ -2124,13 +2158,13 @@ plot.cv.rq.group.pen <- function (x,...)
 #' 
 #' @description Fits a quantile regression model with the LASSO penalty. Uses the augmented data approach similar to the proposal in Sherwood and Wang (2016).   
 #' 
-#' @export
+#' @keywords internal
 #'
-#' @examples
+#' @examples \dontrun{
 #' x <- matrix(rnorm(800),nrow=100)
 #' y <- 1 + x[,1] - 3*x[,5] + rnorm(100)
 #' lassoModel <- rq.lasso.fit(x,y,lambda=.1)
-#' 
+#' }
 #' @references 
 #' \itemize{
 #' \item Tibshirani, R. (1996). Regression shrinkage and selection via the lasso. \emph{Journal of the Royal Statistical Society. Series B}, \bold{58}, 267--288.
@@ -2246,7 +2280,6 @@ rq.lasso.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,
 #' 
 #' @description This function is no longer exported. 
 #' 
-#' @export
 #'
 predict.rq.pen <- function(object, newx,...){
   coefs <- object$coefficients
@@ -2267,7 +2300,6 @@ predict.rq.pen <- function(object, newx,...){
 #' 
 #' @description This function is no longer exported. 
 #' 
-#' @export
 #'
 predict.cv.rq.pen <- function(object, newx, lambda="lambda.min",...){
   if(lambda == "lambda.min"){
@@ -2286,7 +2318,6 @@ predict.cv.rq.pen <- function(object, newx, lambda="lambda.min",...){
 #' @param ... Additional parameters. 
 #'
 #' @return Vector of coefficients. 
-#' @export
 #'
 coef.cv.rq.group.pen <- function(object, lambda='min',...){
   if(lambda=='min'){
@@ -2361,7 +2392,6 @@ coef.cv.rq.group.pen <- function(object, lambda='min',...){
 #' \item{a}{Value of a for the penalized loss function.}
 #' }
 #' 
-
 #' @export
 #'
 #' @examples
@@ -2494,7 +2524,6 @@ rq.group.pen <- function(x,y, tau=.5,groups=1:ncol(x), penalty=c("gLASSO","gAdLA
 #' @description Warning: this function is no longer exported. 
 #'
 #' @return Prints coefficients and cross validation results. 
-#' @export
 #'
 print.cv.rq.pen <- function(x,...){
    cat("\nCoefficients:\n")
@@ -2509,7 +2538,6 @@ print.cv.rq.pen <- function(x,...){
 #' @param ... Additional arguments
 #'
 #' @return prints coefficients
-#' @export
 #'
 print.rq.pen <- function(x,...){
   cat("\nCoefficients:\n")
