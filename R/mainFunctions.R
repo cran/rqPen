@@ -319,7 +319,8 @@ print.rq.pen.seq <- function(x,...){
 #' @param ... Additional parameters.
 #'
 #' @return Coefficients for a given lambda, or the lambda associated with the minimum cv value. 
-#' @export
+#' 
+#' @keywords internal
 #'
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu}
 coef.cv.rq.pen <- function(object, lambda='min',...){
@@ -1746,6 +1747,8 @@ bytau.plot.rq.pen.seq.cv <- function(x,septau=TRUE,cvmin=TRUE,useDefaults=TRUE,v
 #'
 #' @return returns a cross validation plot
 #'
+#' @keywords internal
+#'
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu} 
 cv_plots <- function(model,logLambda=TRUE,loi=NULL,...){
   cv_data <- model$cv
@@ -1760,6 +1763,7 @@ cv_plots <- function(model,logLambda=TRUE,loi=NULL,...){
 }
 
 #' Old cross validation function for group penalty
+#' 
 #' 
 #' 
 #'
@@ -2012,6 +2016,8 @@ cv.rq.group.pen <- function (x, y, groups, tau = 0.5, lambda = NULL, penalty = "
 #' Only the SCAD and MCP penalties incorporate the group structure into the penalty. The group lasso penalty is implemented because it is 
 #' needed for the SCAD and MCP algorithm. We use a group penalty extension of the QICD algorithm presented by Peng and Wang (2015). 
 #' 
+#' @keywords internal
+#' 
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu} and Adam Maidman
 #' 
 #' @references 
@@ -2123,6 +2129,8 @@ rq.group.fit <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE,
 #' @param x A cv.rq.group.pen object
 #' @param ... Additional parameters for plot function.
 #'
+#' @keywords internal
+#' 
 #' @return A cross validation plot. 
 #'
 plot.cv.rq.group.pen <- function (x,...) 
@@ -2278,6 +2286,8 @@ rq.lasso.fit <- function(x,y,tau=.5,lambda=NULL,weights=NULL,intercept=TRUE,
 #'
 #' @return A vector of predictions. 
 #' 
+#' @keywords internal
+#' 
 #' @description This function is no longer exported. 
 #' 
 #'
@@ -2297,6 +2307,8 @@ predict.rq.pen <- function(object, newx,...){
 #' @param ... Additional parameters that are currenlty ignored
 #'
 #' @return A vector of predictions. 
+#'
+#' @keywords internal
 #' 
 #' @description This function is no longer exported. 
 #' 
@@ -2316,6 +2328,9 @@ predict.cv.rq.pen <- function(object, newx, lambda="lambda.min",...){
 #' @param object A cv.rq.group.pen object.
 #' @param lambda The lambda value, default is to use the one associated with the minimum cv error. 
 #' @param ... Additional parameters. 
+#'
+#' @keywords internal
+#'
 #'
 #' @return Vector of coefficients. 
 #'
@@ -2341,7 +2356,7 @@ coef.cv.rq.group.pen <- function(object, lambda='min',...){
 #' @param alg Algorithm used. Choices are Huber approximation ("huber"), linear programming ("lp") or quantile iterative coordinate descent ("qicd").
 #' @param a The additional tuning parameter for adaptive lasso, SCAD and MCP. 
 #' @param norm Whether a L1 or L2 norm is used for the grouped coefficients. 
-#' @param group.pen.factor Penalty factor for each group.
+#' @param group.pen.factor Penalty factor for each group. Default is 1 for all groups if norm=1 and square root of group size if norm=2. 
 #' @param tau.penalty.factor Penalty factor for each quantile.
 #' @param scalex Whether X should be centered and scaled so that the columns have mean zero and standard deviation of one. If set to TRUE, the coefficients will be returned to the original scale of the data.
 #' @param coef.cutoff Coefficient cutoff where any value below this number is set to zero. Useful for the lp algorithm, which are prone to finding almost, but not quite, sparse solutions. 
@@ -2415,14 +2430,25 @@ coef.cv.rq.group.pen <- function(object, lambda='min',...){
 #' \insertRef{qr_cd}{rqPen}
 rq.group.pen <- function(x,y, tau=.5,groups=1:ncol(x), penalty=c("gLASSO","gAdLASSO","gSCAD","gMCP"),
 						lambda=NULL,nlambda=100,eps=ifelse(nrow(x)<ncol(x),.05,.01),alg=c("huber","br","qicd"), 
-						a=NULL, norm=2, group.pen.factor=rep(1,length(unique(groups))),tau.penalty.factor=rep(1,length(tau)),
+						a=NULL, norm=2, group.pen.factor=NULL,tau.penalty.factor=rep(1,length(tau)),
 						scalex=TRUE,coef.cutoff=1e-8,max.iter=500,converge.eps=1e-4,gamma=IQR(y)/10, lambda.discard=TRUE, ...){
 	penalty <- match.arg(penalty)
 	alg <- match.arg(alg)
+	if(norm != 1 & norm != 2){
+		stop("norm must be 1 or 2")
+	}
+	
+	g <- length(unique(groups))
+	if(is.null(group.pen.factor)){
+		if(norm == 2){
+			group.pen.factor <- sqrt(xtabs(~groups))
+		} else{
+			group.pen.factor <- rep(1,g)
+		}
+	}
 	dims <- dim(x)
 	n <- dims[1]
 	p <- dims[2]
-	g <- length(unique(groups))
 	nt <- length(tau)
 	na <- length(a)
 	lpf <- length(group.pen.factor)
@@ -2443,9 +2469,7 @@ rq.group.pen <- function(x,y, tau=.5,groups=1:ncol(x), penalty=c("gLASSO","gAdLA
 	}
 	#penalty <- match.arg(penalty)
 	#alg <- match.arg(alg)
-	if(norm != 1 & norm != 2){
-		stop("norm must be 1 or 2")
-	}
+	
 	if(!is.matrix(x)){
 	  stop("x must be a matrix")
 	}
@@ -2523,6 +2547,8 @@ rq.group.pen <- function(x,y, tau=.5,groups=1:ncol(x), penalty=c("gLASSO","gAdLA
 #' 
 #' @description Warning: this function is no longer exported. 
 #'
+#' @keywords internal
+#'
 #' @return Prints coefficients and cross validation results. 
 #'
 print.cv.rq.pen <- function(x,...){
@@ -2537,6 +2563,8 @@ print.cv.rq.pen <- function(x,...){
 #' @param x A rq.pen object
 #' @param ... Additional arguments
 #'
+#' @keywords internal
+#' 
 #' @return prints coefficients
 #'
 print.rq.pen <- function(x,...){
