@@ -26,7 +26,7 @@
 qic <- function(model,n, method=c("BIC","AIC","PBIC")){
   method <- match.arg(method)
 	tau <- model$debug
-	df <- sum(model$coefficients != 0)
+	df <- model$nzero
 	if(method=="PBIC"){
 		log(model$rho*n) + df*log(n)*log(length(model$coefficients))/(2*n)
 	} else if (method == "BIC"){		    
@@ -463,7 +463,13 @@ rq.pen <- function(x,y,tau=.5,lambda=NULL,penalty=c("LASSO","Ridge","ENet","aLAS
 		fit <- rq.enet(x,y,tau,lambda,nlambda,eps, penalty.factor,scalex=FALSE,tau.penalty.factor,a,max.iter,converge.eps,gamma,lambda.discard=lambda.discard,...)
 	} else if(penalty == "aLASSO" | penalty=="SCAD" | penalty == "MCP"){
 		fit <- rq.nc(x,y,tau,penalty,a,lambda,nlambda=nlambda,eps=eps,penalty.factor=penalty.factor,alg=alg,scalex=FALSE,tau.penalty.factor=tau.penalty.factor,coef.cutoff=coef.cutoff,max.iter=max.iter,converge.eps=converge.eps,gamma,lambda.discard=lambda.discard,...)
-	}
+	} 
+	#else if(penalty == "gQuant"){
+		# fit <- rq.pen.gq1y(x,y,tau,lambda,nlambda=100,eps,scalex=FALSE,penalty.factor=penalty.factor, 
+							# tau.penalty.factor=tau.penalty.factor,
+							# max.iter=max.iter,converge.eps=converge.eps,lambda.discard=lambda.discard,
+							# gamma=gamma)
+	# }
 	if(scalex){
 		for(i in 1:length(fit$models)){
 			if(!is.null(dim(fit$models[[i]]$coefficients))){
@@ -2449,6 +2455,9 @@ rq.group.pen <- function(x,y, tau=.5,groups=1:ncol(x), penalty=c("gLASSO","gAdLA
 	dims <- dim(x)
 	n <- dims[1]
 	p <- dims[2]
+	if(length(groups)!=p){
+	  stop("length of groups is not equal to number of columns in x")
+	}
 	nt <- length(tau)
 	na <- length(a)
 	lpf <- length(group.pen.factor)
