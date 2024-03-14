@@ -61,7 +61,7 @@ cv.rq.group.pen(
 }
 \value{
 Returns the following: 
-\itemize{         
+\describe{
 \item{beta}{ Matrix of coefficients for different values of lambda}
 \item{residuals}{ Matrix of residuals for different values of lambda.}
 \item{rho}{Vector of rho, unpenalized portion of the objective function, for different values of lambda.}
