@@ -249,9 +249,7 @@ rq.huber.deriv<- function(r, tau, gamma){
 neg.gradient <- function(r,weights,tau,gamma,x,apprx){
   #if(apprx=="huber"){
   wt_deriv <- as.vector(weights*rq.huber.deriv(r, tau, gamma))
-  #}else{
-  #  wt_deriv <- as.vector(weights*rq.tanh.deriv(r, tau, gamma))
-  #}
+
   
   if(is.null(dim(x))){
     mean(x*wt_deriv)
@@ -752,7 +750,7 @@ createModelsInfo <- function(models){
 	modelsInfo
 }
 
-rq.nc <- function(x, y, tau=.5,  penalty=c("SCAD","aLASSO","MCP"),a=NULL,lambda=NULL,nlambda=100,eps=ifelse(nrow(x)<ncol(x),.01,.0001),alg=c("huber","br","QICD"),scalex=TRUE,
+rq.nc <- function(x, y, tau=.5,  penalty=c("SCAD","aLASSO","MCP"),a=NULL,lambda=NULL,nlambda=100,eps=ifelse(nrow(x)<ncol(x),.01,.0001),alg=c("huber","br"),scalex=TRUE,
 					penalty.factor = rep(1, ncol(x)),tau.penalty.factor=rep(1,length(tau)),coef.cutoff=1e-8,max.iter=10000,converge.eps=1e-7,lambda.discard=TRUE,weights=NULL,...) {
 	#should look at how ncvreg generates the lambda sequence and combine that with the Huber based approach
 	penalty <- match.arg(penalty)
@@ -773,45 +771,17 @@ rq.nc <- function(x, y, tau=.5,  penalty=c("SCAD","aLASSO","MCP"),a=NULL,lambda=
 	a <- getA(a,penalty)
 	na <- length(a)
 	
-	if(alg != "qicd" & alg != "QICD"){
 	#QICD implementation not provided in rq.lasso
-		if(penalty=="aLASSO"){
-			init.model <- rq.enet(x,y,tau,lambda=lambda,scalex=scalex,penalty.factor=penalty.factor,
+	if(penalty=="aLASSO"){
+		init.model <- rq.enet(x,y,tau,lambda=lambda,scalex=scalex,penalty.factor=penalty.factor,
 						tau.penalty.factor=tau.penalty.factor,coef.cutoff=coef.cutoff,max.iter=max.iter,
 						converge.eps=converge.eps,lambda.discard=lambda.discard,...)
-		} else{
-			init.model <- rq.lasso(x,y,tau,alg=alg,lambda=lambda,scalex=scalex,penalty.factor=penalty.factor,
+	} else{
+		init.model <- rq.lasso(x,y,tau,alg=alg,lambda=lambda,scalex=scalex,penalty.factor=penalty.factor,
 						tau.penalty.factor=tau.penalty.factor,coef.cutoff=coef.cutoff,max.iter=max.iter,
 						converge.eps=converge.eps,lambda.discard=lambda.discard,weights=weights,...)
-		}
-		rq.lla(init.model,x,y,penalty,a,penalty.factor,tau.penalty.factor,scalex,coef.cutoff,max.iter,converge.eps,lambda.discard=lambda.discard,weights=weights,...)
-	} else{
-		if(length(unique(penalty.factor))!=1 & length(unique(tau.penalty.factor))!=1){
-			warning("The QICD algorithm takes predictor and tau penalty factors and turns them into a zero or 1. Zero if the weight is zero and one otherwise. Other algorithms are better if you want a more nuanced approach.")
-		}
-		pos <- 1
-		models <- vector(mode="list",length=nt*na)
-		modelNames <- NULL
-		for(i in 1:nt){
-			for(j in 1:na){
-				coefs <- NULL
-				for(lam in lambda){
-					sublam <- lam*penalty.factor*tau.penalty.factor[i]
-					penvars <- which(sublam != 0)
-					subm <- rq.nc.fit(x,y,tau[i],lambda=lam, alg="QICD", a=a[j], coef.cutoff=coef.cutoff,converge_criteria=converge.eps,penVars=penvars,internal=TRUE,weights=weights,...)
-					coefs <- cbind(coefs,coefficients(subm))
-				}
-				models[[pos]] <- rq.pen.modelreturn(coefs,x,y,tau[i],lambda,local.penalty.factor=penalty.factor*tau.penalty.factor[j],penalty,a[j],weights=weights)
-				modelNames <- c(modelNames,paste0("tau",tau[i],"a",a[j]))
-				pos <- pos + 1
-			}
-		}
-		names(models) <- modelNames
-		returnVal <- list(models=models, n=n, p=p,alg=alg,tau=tau,lambda=lambda,penalty.factor=penalty.factor,penalty=penalty,a=a)		
-		returnVal$modelsInfo <- createModelsInfo(models)
-		class(returnVal) <- "rq.pen.seq"
-		returnVal
 	}
+		rq.lla(init.model,x,y,penalty,a,penalty.factor,tau.penalty.factor,scalex,coef.cutoff,max.iter,converge.eps,lambda.discard=lambda.discard,weights=weights,...)
 }
 
 group_derivs <- function(deriv_func,groups,coefs,lambda,a=3.7,norm=1){
@@ -900,7 +870,6 @@ qaSIS <- function(x,y,tau=.5,linear=FALSE,...){#n.cores=1,...){
 
 #need to update this and think about what penalty.factor needs to be used. 
 rq.pen.modelreturn <- function(coefs,x,y,tau,lambda,local.penalty.factor,penalty,a,weights=NULL){
-# for loop that could be removed
 	penfunc <- getPenfunc(penalty)
 	return_val <- NULL
 	if(is.null(ncol(coefs))==FALSE){
@@ -980,6 +949,10 @@ elastic <- function(x,lambda,a){
 	a*lasso(x,lambda)+(1-a)*ridge(x,lambda)
 }
 
+#placeholder to deal with that group quantile lasso does not provide an individual penalty
+gq <- function(x,lambda,a){
+  0
+}
 
 getPenfunc <- function(penalty){
 	if(penalty == "LASSO" | penalty == "gLASSO" | penalty=="aLASSO" | penalty=="gAdLASSO"){
@@ -992,6 +965,8 @@ getPenfunc <- function(penalty){
 		penfunc <- mcp
 	} else if(penalty=="ENet"){
 		penfunc <- elastic
+	} else if(penalty=="gq"){
+	  penfunc <- gq
 	}
 	penfunc
 }
@@ -1154,53 +1129,6 @@ rq.group.lin.prog <- function(x,y,groups,tau,lambda,intercept=TRUE,eps=1e-05,pen
     sub_fit$penalty <- penalty
     class(sub_fit) <-  c("rq.pen", "rqNC")
     sub_fit
-}
-
-
-groupMultLambda <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE, penalty="LASSO", 
-    #initial_beta = NULL,
-    alg="QICD_warm",penGroups=NULL, ...) 
-{
-    if(alg != "QICD_warm"){
-		#don't know how to do warm start with linear programming approach 
-		return_val <- list()
-		pos <- 1
-		for (lam in lambda) {
-			return_val[[pos]] <- rq.group.fit(x = x, y = y, groups = groups, 
-				tau = tau, lambda = lam, intercept = intercept, penalty=penalty,alg=alg, penGroups=penGroups,
-				...)
-			#initial_beta <- return_val[[pos]]$coefficients
-			pos <- pos + 1
-		}
-	} else{
-		p <- dim(x)[2]
-		pos <- 1
-		alg = "QICD"
-		
-		return_val <- list()
-		if(intercept){
-			initial_beta <- c(quantile(y,tau), rep(0,p))
-		} else{
-			initial_beta <- rep(0,p)
-		}
-		
-		for(lam in lambda){
-			return_val[[pos]] <- rq.group.fit(x=x, y=y, groups=groups, tau=tau, lambda= lam, intercept=intercept, penalty="LASSO", alg=alg, initial_beta=initial_beta, penGroups=penGroups, ...)
-			initial_beta <- coefficients(return_val[[pos]])
-			pos <- pos + 1
-		}
-		
-		#if penalty is not lasso then update those initial estimates
-		if(penalty != "LASSO"){
-			pos <- 1
-			for(lam in lambda){
-				initial_beta <- coefficients(return_val[[pos]]) #use lasso estimate as initial estimate
-				return_val[[pos]] <- rq.group.fit(x=x, y=y, groups=groups, tau=tau, lambda= lam, intercept=intercept, penalty=penalty, alg=alg, initial_beta=initial_beta, penGroups=penGroups, ...)
-				pos <- pos + 1
-			}
-		}
-	}
-    return_val
 }
 
 nonzero <- function (obj) 
@@ -1464,4 +1392,21 @@ plotsep.rq.pen.seq.cv <- function(x,tau,logLambda,main,...){
 	if(nt > 1){
 		par(ask=FALSE)
 	}
+}
+
+#Modified March 15 2024 to get rid of references to QICD code
+groupMultLambda <- function (x, y, groups, tau = 0.5, lambda, intercept = TRUE, penalty="LASSO", 
+                             #initial_beta = NULL,
+                             alg="huber",penGroups=NULL, ...) 
+{
+    return_val <- list()
+    pos <- 1
+    for (lam in lambda) {
+      return_val[[pos]] <- rq.group.fit(x = x, y = y, groups = groups, 
+                                        tau = tau, lambda = lam, intercept = intercept, penalty=penalty,alg=alg, penGroups=penGroups,
+                                        ...)
+      #initial_beta <- return_val[[pos]]$coefficients
+      pos <- pos + 1
+    }
+  return_val
 }
