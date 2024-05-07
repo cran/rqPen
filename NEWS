@@ -1,3 +1,13 @@
+rqPen 4.1 (Release date: 2024-04-22)
+=============
+* Fixed a bug where rq.group.pen() was not working with group SCAD and norm=2.
+* Updated rq.gq.pen.cv() to accomodate notes.
+* Updated rq.gq.pen.cv(), rq.group.pen.cv(), and rq.pen.cv() help files to include use of weights in cross-validation. 
+* Cleaned up some minor issues in examples, were code ran fine but presentation was poor. 
+* Added some new error checking to functions.
+* Stopped exporting print() functions
+* Minor changes to plot.rq.pen.seq.cv() output, changing pch=20 for all cases
+
 rqPen 4.0  (Release date: 2024-04-18)
 =============
 * Added rq.gq.pen() and rq.gq.pen.cv() for a group lasso penalty across the quantiles that gurantees that when estimating multiple quantiles the same variables are selected across all quantiles. 

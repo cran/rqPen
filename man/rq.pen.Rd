@@ -93,8 +93,8 @@ with a lasso penalty with different weights for each predictor.
 }
 \description{
 Let q index the Q quantiles of interest. Let \eqn{\rho_\tau(a) = a[\tau-I(a<0)]}. Fits quantile regression models by minimizing the penalized objective function of
-\deqn{\frac{1}{n} \sum_{q=1}^Q \sum_{i=1}^n \rho_\tau(y_i-x_i^\top\beta^q) + \sum_{q=1}^Q  \sum_{j=1}^p P(\beta^q_p,w_q*v_j*\lambda,a).}
-Where \eqn{w_q} and \eqn{v_j} are designated by penalty.factor and tau.penalty.factor respectively. Value of \eqn{P()} depends on the penalty. See references or vignette for more details,
+\deqn{\frac{1}{n} \sum_{q=1}^Q \sum_{i=1}^n m_i \rho_\tau(y_i-x_i^\top\beta^q) + \sum_{q=1}^Q  \sum_{j=1}^p P(\beta^q_p,w_q*v_j*\lambda,a).}
+Where \eqn{w_q} and \eqn{v_j} are designated by penalty.factor and tau.penalty.factor respectively, and \eqn{m_i} is designated by weights. Value of \eqn{P()} depends on the penalty. See references or vignette for more details,
 \describe{
 \item{LASSO:}{ \eqn{P(\beta,\lambda,a)=\lambda|\beta|}}
 \item{SCAD:}{ \eqn{P(\beta,\lambda,a)=SCAD(\beta,\lambda,a)}}
@@ -114,7 +114,7 @@ The huber algorithm offers substantial speed advantages without much, if any, lo
 n <- 200
 p <- 8
 x <- matrix(runif(n*p),ncol=p)
-y <- 1 + x[,1] + x[,8] + (1+.5*x[,3])*rnorm(100)
+y <- 1 + x[,1] + x[,8] + (1+.5*x[,3])*rnorm(n)
 r1 <- rq.pen(x,y) #Lasso fit for median
 # Lasso for multiple quantiles
 r2 <- rq.pen(x,y,tau=c(.25,.5,.75))
@@ -137,5 +137,5 @@ r5 <- rq.pen(x,y,tau=tvals, tau.penalty.factor=sqrt(tvals*(1-tvals)))
 \insertRef{qr_cd}{rqPen}
 }
 \author{
-Ben Sherwood, \email{ben.sherwood@ku.edu} and Adam Maidman
+Ben Sherwood, \email{ben.sherwood@ku.edu}, Shaobo Li, and Adam Maidman
 }

@@ -23,10 +23,11 @@
 #' Uses the group lasso penalty across the quantiles to provide consistent selection across all, K, modeled quantiles. Let \eqn{\beta^q}
 #' be the coefficients for the kth quantiles, \eqn{\beta_j} be the Q-dimensional vector of the jth coefficient for each quantile, and
 #' \eqn{\rho_\tau(u)} is the quantile loss function. The method minimizes
-#' \deqn{\sum_{q=1}^Q \frac{1}{n} \sum_{i=1}^n \rho_\tau(y_i-x_i^\top\beta^q) + \lambda \sum_{j=1}^p ||\beta_j||_{2,w}  .}
+#' \deqn{\sum_{q=1}^Q \frac{1}{n} \sum_{i=1}^n m_i \rho_\tau(y_i-x_i^\top\beta^q) + \lambda \sum_{j=1}^p ||\beta_j||_{2,w}  .}
 #' Uses a Huber approximation in the fitting of model, as presented in Sherwood and Li (2022). Where,
-#' \deqn{||\beta_j||_{2,w} = \sqrt{\sum_{k=1}^K w_km_j\beta_{kj}^2}}, where \eqn{w_k} is a quantile weight 
-#' that can be specified by \code{tau.penalty.factor} and \eqn{m_j} is a predictor weight that can be assigned by \code{penalty.factor}. 
+#' \deqn{||\beta_j||_{2,w} = \sqrt{\sum_{k=1}^K w_kv_j\beta_{kj}^2},} where \eqn{w_k} is a quantile weight 
+#' that can be specified by \code{tau.penalty.factor}, \eqn{v_j} is a predictor weight that can be assigned by \code{penalty.factor}, 
+#' and \eqn{m_i} is an observation weight that can be set by \code{weights}. 
 #'
 #' @return An rq.pen.seq object. 
 #' \describe{
@@ -69,26 +70,46 @@
 #' 
 #' \insertRef{huberGroup}{rqPen}
 #' 
-#' @author Shaobo Li \email{shaobo.li@ku.edu} and Ben Sherwood, \email{ben.sherwood@ku.edu} 
+#' @author Shaobo Li and Ben Sherwood, \email{ben.sherwood@ku.edu} 
 rq.gq.pen <- function(x, y, tau, lambda=NULL, nlambda=100,  eps = ifelse(nrow(x) < ncol(x), 0.01, 0.001),
                           weights=NULL, penalty.factor=NULL, scalex=TRUE, tau.penalty.factor=NULL, gmma=0.2, 
                           max.iter=200, lambda.discard=TRUE, converge.eps=1e-4, beta0=NULL){
-  
   ## basic info about dimensions
   ntau <- length(tau)
   np<- dim(x)
   n<- np[1]; p<- np[2]
   #ng<- p
   nng<- rep(ntau, p)
+  if(is.null(penalty.factor)) penalty.factor<- 1
+  if(is.null(weights)) weights<- rep(1, n)
+  if(is.null(tau.penalty.factor)) tau.penalty.factor<- rep(1, ntau)
   
   ## some initial checks
   if(ntau < 3){
     stop("please provide at least three tau values!")
   }
-  if(is.null(penalty.factor)) penalty.factor<- 1
-  if(is.null(weights)) weights<- rep(1, n)
-  if(is.null(tau.penalty.factor)) tau.penalty.factor<- rep(1, ntau)
   
+  if(length(y)!=nrow(x)){
+    stop("length of x and number of rows in x are not the same")
+  }
+  if(is.null(weights)==FALSE){
+    if(length(weights)!=length(y)){
+      stop("number of weights does not match number of responses")
+    }
+    if(sum(weights<=0)>0){
+      stop("all weights most be positive")
+    }
+  }
+  if(is.matrix(y)==TRUE){
+    y <- as.numeric(y)
+  }
+  if(min(penalty.factor) < 0 | min(tau.penalty.factor) < 0){
+    stop("Penalty factors must be non-negative.")
+  }
+  if(sum(penalty.factor)==0 | sum(tau.penalty.factor)==0){
+    stop("Cannot have zero for all entries of penalty factors. This would be an unpenalized model")
+  }
+
   ## standardize X
   if(scalex){
     x <- scale(x)

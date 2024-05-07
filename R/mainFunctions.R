@@ -41,7 +41,15 @@ qic <- function(model,n, method=c("BIC","AIC","PBIC")){
 
 #' Select tuning parameters using IC 
 #' 
-#' Selects tuning parameters using IC. If weights were used for the loss function then same weights will be used in calculating IC. 
+#' Selects tuning parameter \eqn{\lambda} and a according to information criterion of choice. For a given \eqn{\hat{\beta}} the information criterion is calculated
+#' as
+#' \deqn{\log(\sum_{i=1}^n w_i \rho_\tau(y_i-x_i^\top\hat{\beta})) + d*b/(2n),} where d is the number of nonzero coefficients and b depends on the method used. For AIC \eqn{b=2},
+#' for BIC \eqn{b=log(n)} and for PBIC \eqn{d=log(n)*log(p)} where p is the dimension of \eqn{\hat{\beta}}.
+#' If septau set to FALSE then calculations are made across the quantiles. Let \eqn{\hat{\beta}^q} be the coefficient vector for the qth quantile of Q quantiles. In addition let \eqn{d_q} and \eqn{b_q} 
+#' be d and b values from the qth quantile model. Note, for all of these we are assuming eqn and a are the same. Then the summary across all quantiles is 
+#' \deqn{\sum_{q=1}^Q w_q[ \log(\sum_{i=1}^n m_i \rho_\tau(y_i-x_i^\top\hat{\beta}^q)) + d_q*b_q/(2n)],}
+#' where \eqn{w_q} is the weight assigned for the qth quantile model. 
+#'
 #'
 #' @param obj A rq.pen.seq or rq.pen.seq.cv object. 
 #' @param ... Additional arguments see qic.select.rq.pen.seq() or qic.select.rq.pen.seq.cv() for more information. 
@@ -69,7 +77,7 @@ qic.select <- function(obj,...){
 #' for BIC \eqn{b=log(n)} and for PBIC \eqn{d=log(n)*log(p)} where p is the dimension of \eqn{\hat{\beta}}.
 #' If septau set to FALSE then calculations are made across the quantiles. Let \eqn{\hat{\beta}^q} be the coefficient vector for the qth quantile of Q quantiles. In addition let \eqn{d_q} and \eqn{b_q} 
 #' be d and b values from the qth quantile model. Note, for all of these we are assuming eqn and a are the same. Then the summary across all quantiles is 
-#' \deqn{\sum_{q=1}^Q w_q[ \log(\sum_{i=1}^n  \rho_\tau(y_i-x_i^\top\hat{\beta}^q)) + d_q*b_q/(2n)],}
+#' \deqn{\sum_{q=1}^Q w_q[ \log(\sum_{i=1}^n m_i \rho_\tau(y_i-x_i^\top\hat{\beta}^q)) + d_q*b_q/(2n)],}
 #' where \eqn{w_q} is the weight assigned for the qth quantile model. 
 #'
 #' @param obj A rq.pen.seq or rq.pen.seq.cv object. 
@@ -308,7 +316,6 @@ predict.qic.select <- function(object, newx, ...){
 #' @param ... optional arguments
 #'
 #' @return If only one model, prints a data.frame of the number of nonzero coefficients and lambda. Otherwise prints information about the quantiles being modeled and choices for a.
-#' @export
 #'
 #' @method print rq.pen.seq
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu}
@@ -376,8 +383,8 @@ coef.cv.rq.pen <- function(object, lambda='min',...){
 #' 
 #' @description  
 #' Let q index the Q quantiles of interest. Let \eqn{\rho_\tau(a) = a[\tau-I(a<0)]}. Fits quantile regression models by minimizing the penalized objective function of
-#' \deqn{\frac{1}{n} \sum_{q=1}^Q \sum_{i=1}^n \rho_\tau(y_i-x_i^\top\beta^q) + \sum_{q=1}^Q  \sum_{j=1}^p P(\beta^q_p,w_q*v_j*\lambda,a).}
-#' Where \eqn{w_q} and \eqn{v_j} are designated by penalty.factor and tau.penalty.factor respectively. Value of \eqn{P()} depends on the penalty. See references or vignette for more details,
+#' \deqn{\frac{1}{n} \sum_{q=1}^Q \sum_{i=1}^n m_i \rho_\tau(y_i-x_i^\top\beta^q) + \sum_{q=1}^Q  \sum_{j=1}^p P(\beta^q_p,w_q*v_j*\lambda,a).}
+#' Where \eqn{w_q} and \eqn{v_j} are designated by penalty.factor and tau.penalty.factor respectively, and \eqn{m_i} is designated by weights. Value of \eqn{P()} depends on the penalty. See references or vignette for more details,
 #' \describe{
 #' \item{LASSO:}{ \eqn{P(\beta,\lambda,a)=\lambda|\beta|}}
 #' \item{SCAD:}{ \eqn{P(\beta,\lambda,a)=SCAD(\beta,\lambda,a)}}
@@ -425,7 +432,7 @@ coef.cv.rq.pen <- function(object, lambda='min',...){
 #' n <- 200
 #' p <- 8
 #' x <- matrix(runif(n*p),ncol=p)
-#' y <- 1 + x[,1] + x[,8] + (1+.5*x[,3])*rnorm(100)
+#' y <- 1 + x[,1] + x[,8] + (1+.5*x[,3])*rnorm(n)
 #' r1 <- rq.pen(x,y) #Lasso fit for median
 #' # Lasso for multiple quantiles
 #' r2 <- rq.pen(x,y,tau=c(.25,.5,.75))
@@ -445,17 +452,28 @@ coef.cv.rq.pen <- function(object, lambda='min',...){
 #' \insertRef{qr_lasso}{rqPen}
 #' 
 #' \insertRef{qr_cd}{rqPen}
-#' @author Ben Sherwood, \email{ben.sherwood@ku.edu} and Adam Maidman
+#' @author Ben Sherwood, \email{ben.sherwood@ku.edu}, Shaobo Li, and Adam Maidman
 rq.pen <- function(x,y,tau=.5,lambda=NULL,penalty=c("LASSO","Ridge","ENet","aLASSO","SCAD","MCP"),a=NULL,nlambda=100,eps=ifelse(nrow(x)<ncol(x),.05,.01), 
 	penalty.factor = rep(1, ncol(x)),alg=c("huber","br","QICD","fn"),scalex=TRUE,tau.penalty.factor=rep(1,length(tau)),
 	coef.cutoff=1e-8,max.iter=10000,converge.eps=1e-7,lambda.discard=TRUE,weights=NULL,...){
 	penalty <- match.arg(penalty)
 	alg <- match.arg(alg)
-	if(is.null(weights)==FALSE & ( penalty=="ENet" | penalty=="Ridge")){
-		stop("Cannot use weights with elastic net or ridge penalty. Can use it with lasso, though may be much slower than unweighted version.")
+	if(length(y)!=nrow(x)){
+	  stop("length of x and number of rows in x are not the same")
 	}
-	if(is.null(weights)==FALSE & penalty=="aLASSO"){
-		warning("Weights are ignored when getting initial (Ridge) estimates for adaptive Lasso")
+	if(is.null(weights)==FALSE){
+	  if( penalty=="ENet" | penalty=="Ridge"){
+		  stop("Cannot use weights with elastic net or ridge penalty. Can use it with lasso, though may be much slower than unweighted version.")
+	  }
+	  if(penalty=="aLASSO"){
+	    warning("Weights are ignored when getting initial (Ridge) estimates for adaptive Lasso")
+	  }
+	  if(length(weights)!=length(y)){
+	    stop("number of weights does not match number of responses")
+	  }
+	  if(sum(weights<=0)>0){
+	    stop("all weights most be positive")
+	  }
 	}
 	if(is.matrix(y)==TRUE){
 		y <- as.numeric(y)
@@ -638,23 +656,23 @@ predict.rq.pen.seq <- function(object, newx,tau=NULL,a=NULL,lambda=NULL,modelsIn
 #' @param nlambda Number of lambda, ignored if lambda is set.
 #' @param groupError If set to false then reported error is the sum of all errors, not the sum of error for each fold.  
 #' @param cvSummary Function to summarize the errors across the folds, default is mean. User can specify another function, such as median.
-#' @param tauWeights Weights for the different tau models. 
+#' @param tauWeights Weights for the different tau models. Only used in group tau results (gtr). 
 #' @param printProgress If set to TRUE prints which partition is being worked on. 
 #' @param weights Weights for the quantile loss objective function.
 #' @param ... Additional arguments passed to rq.pen()
 #' 
 #' @details 
 #' Two cross validation results are returned. One that considers the best combination of a and lambda for each quantile. The second considers the best combination of the tuning 
-#' parameters for all quantiles. Let \eqn{y_{b,i}} and \eqn{x_{b,i}} index the observations in 
+#' parameters for all quantiles. Let \eqn{y_{b,i}}, \eqn{x_{b,i}}, and \eqn{m_{b,i}} index the response, predictors, and weights of observations in 
 #' fold b. Let \eqn{\hat{\beta}_{\tau,a,\lambda}^{-b}} be the estimator for a given quantile and tuning parameters that did not use the bth fold. Let \eqn{n_b} be the number of observations in fold
 #' b. Then the cross validation error for fold b is 
-#' \deqn{\mbox{CV}(b,\tau) = \frac{1}{n_b} \sum_{i=1}^{n_b} \rho_\tau(y_{b,i}-x_{b,i}^\top\hat{\beta}_{\tau,a,\lambda}^{-b}).}
+#' \deqn{\mbox{CV}(b,\tau) = \frac{1}{n_b} \sum_{i=1}^{n_b} m_{b,i} \rho_\tau(y_{b,i}-x_{b,i}^\top\hat{\beta}_{\tau,a,\lambda}^{-b}).}
 #' Note that \eqn{\rho_\tau()} can be replaced by a different function by setting the cvFunc parameter. The function returns two different cross-validation summaries. The first is btr, by tau results. 
 #' It provides the values of \code{lambda} and \code{a} that minimize the average, or whatever function is used for \code{cvSummary}, of \eqn{\mbox{CV}(b)}. In addition it provides the 
 #' sparsest solution that is within one standard error of the minimum results. 
 #' 
-#' The other approach is the group tau results, gtr. Consider the case of estimating Q quantiles of \eqn{\tau_1,\ldots,\tau_Q} It returns the values of \code{lambda} and \code{a} that minimizes the average, or again whatever function is used for \code{cvSummary}, of 
-#' \deqn{\sum_{q=1}^Q\mbox{CV}(b,\tau_q).} If only one quantile is modeled then the gtr results can be ignored as they provide the same minimum solution as btr. 
+#' The other approach is the group tau results, gtr. Consider the case of estimating Q quantiles of \eqn{\tau_1,\ldots,\tau_Q} with quantile (tauWeights) of \eqn{v_q}. The gtr returns the values of \code{lambda} and \code{a} that minimizes the average, or again whatever function is used for \code{cvSummary}, of 
+#' \deqn{\sum_{q=1}^Q v_q\mbox{CV}(b,\tau_q).} If only one quantile is modeled then the gtr results can be ignored as they provide the same minimum solution as btr. 
 #' 
 #' @return
 #' An rq.pen.seq.cv object. 
@@ -771,7 +789,6 @@ rq.pen.cv <- function(x,y,tau=.5,lambda=NULL,penalty=c("LASSO","Ridge","ENet","a
 #' @param ... Additional arguments. 
 #'
 #' @return Print of btr and gtr from a rq.pen.seq.cv object. If only one quantile is modeled then only btr is returned. 
-#' @export
 #'
 #' @method print rq.pen.seq.cv
 print.rq.pen.seq.cv <- function(x,...){
@@ -890,7 +907,7 @@ coef.rq.pen.seq.cv <- function(object,septau=ifelse(object$fit$penalty!="gq",TRU
 
 
 #' Performs cross validation for a group penalty. 
-#'#'
+#'
 #' @param x Matrix of predictors. 
 #' @param y Vector of responses. 
 #' @param tau Vector of quantiles. 
@@ -902,7 +919,7 @@ coef.rq.pen.seq.cv <- function(object,septau=ifelse(object$fit$penalty!="gq",TRU
 #' @param foldid Fold assignments, if not set this will be randomly created. 
 #' @param groupError If errors are to be reported as a group or as the average for each fold. 
 #' @param cvSummary The 
-#' @param tauWeights Weights for the tau penalty. 
+#' @param tauWeights Weights for the tau penalty only used in group tau results (gtr). 
 #' @param printProgress If set to TRUE will print which fold the process is working on. 
 #' @param weights Weights for the quantile loss function. Used in both model fitting and cross-validation. 
 #' @param ... Additional parameters that will be sent to rq.group.pen().
@@ -918,6 +935,21 @@ coef.rq.pen.seq.cv <- function(object,septau=ifelse(object$fit$penalty!="gq",TRU
 #' \item{gcve}{Group, across all quantiles, cross-validation error results for each value of a and lambda.}
 #' \item{call}{Original call to the function.}
 #' }
+#' 
+#' @details 
+#' Two cross validation results are returned. One that considers the best combination of a and lambda for each quantile. The second considers the best combination of the tuning 
+#' parameters for all quantiles. Let \eqn{y_{b,i}}, \eqn{x_{b,i}}, and \eqn{m_{b,i}} index the response, predictors, and weights of observations in 
+#' fold b. Let \eqn{\hat{\beta}_{\tau,a,\lambda}^{-b}} be the estimator for a given quantile and tuning parameters that did not use the bth fold. Let \eqn{n_b} be the number of observations in fold
+#' b. Then the cross validation error for fold b is 
+#' \deqn{\mbox{CV}(b,\tau) = \frac{1}{n_b} \sum_{i=1}^{n_b} m_{b,i} \rho_\tau(y_{b,i}-x_{b,i}^\top\hat{\beta}_{\tau,a,\lambda}^{-b}).}
+#' Note that \eqn{\rho_\tau()} can be replaced by a different function by setting the cvFunc parameter. The function returns two different cross-validation summaries. The first is btr, by tau results. 
+#' It provides the values of \code{lambda} and \code{a} that minimize the average, or whatever function is used for \code{cvSummary}, of \eqn{\mbox{CV}(b)}. In addition it provides the 
+#' sparsest solution that is within one standard error of the minimum results. 
+#' 
+#' The other approach is the group tau results, gtr. Consider the case of estimating Q quantiles of \eqn{\tau_1,\ldots,\tau_Q} with quantile (tauWeights) of \eqn{v_q}. The gtr returns the values of \code{lambda} and \code{a} that minimizes the average, or again whatever function is used for \code{cvSummary}, of 
+#' \deqn{\sum_{q=1}^Q v_q\mbox{CV}(b,\tau_q).} If only one quantile is modeled then the gtr results can be ignored as they provide the same minimum solution as btr. 
+#' 
+#' 
 #' @export
 #'
 #' @examples
@@ -933,6 +965,7 @@ coef.rq.pen.seq.cv <- function(object,septau=ifelse(object$fit$penalty!="gq",TRU
 #' m4 <- rq.group.pen.cv(x,y,penalty="gMCP",tau=c(.1,.3,.7),a=c(3,4,5),groups=g)
 #' }
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu} and Shaobo Li \email{shaobo.li@ku.edu}
+#' 
 rq.group.pen.cv <- function(x,y,tau=.5,groups=1:ncol(x),lambda=NULL,a=NULL,cvFunc=NULL,nfolds=10,foldid=NULL,groupError=TRUE,cvSummary=mean,tauWeights=rep(1,length(tau)),printProgress=FALSE,weights=NULL,...){
 	n <- length(y)
 	if(is.null(foldid)){
@@ -1988,8 +2021,8 @@ coef.cv.rq.group.pen <- function(object, lambda='min',...){
 #' @description  
 #' Let the predictors be divided into G groups with G corresponding vectors of coefficients, \eqn{\beta_1,\ldots,\beta_G}. 
 #' Let \eqn{\rho_\tau(a) = a[\tau-I(a<0)]}. Fits quantile regression models for Q quantiles by minimizing the penalized objective function of
-#' \deqn{\sum_{q=1}^Q \frac{1}{n} \sum_{i=1}^n \rho_\tau(y_i-x_i^\top\beta^q) + \sum_{q=1}^Q  \sum_{g=1}^G P(||\beta^q_g||_k,w_q*v_j*\lambda,a).}
-#' Where \eqn{w_q} and \eqn{v_j} are designated by penalty.factor and tau.penalty.factor respectively. The value of \eqn{k} is chosen by \code{norm}.
+#' \deqn{\sum_{q=1}^Q \frac{1}{n} \sum_{i=1}^n m_i \rho_\tau(y_i-x_i^\top\beta^q) + \sum_{q=1}^Q  \sum_{g=1}^G P(||\beta^q_g||_k,w_q*v_j*\lambda,a).}
+#' Where \eqn{w_q} and \eqn{v_j} are designated by penalty.factor and tau.penalty.factor respectively and \eqn{m_i} can be set by weights. The value of \eqn{k} is chosen by \code{norm}.
 #' Value of P() depends on the penalty. Briefly, but see references or vignette for more details,
 #' \describe{
 #' \item{Group LASSO (gLASSO)}{\eqn{P(||\beta||_k,\lambda,a)=\lambda||\beta||_k}}
@@ -2052,18 +2085,45 @@ rq.group.pen <- function(x,y, tau=.5,groups=1:ncol(x), penalty=c("gLASSO","gAdLA
 						scalex=TRUE,coef.cutoff=1e-8,max.iter=500,converge.eps=1e-4,gamma=IQR(y)/10, lambda.discard=TRUE,weights=NULL, ...){
 	penalty <- match.arg(penalty)
 	alg <- match.arg(alg)
-	if(norm != 1 & norm != 2){
-		stop("norm must be 1 or 2")
-	}
 	
 	g <- length(unique(groups))
 	if(is.null(group.pen.factor)){
-		if(norm == 2){
-			group.pen.factor <- sqrt(xtabs(~groups))
-		} else{
-			group.pen.factor <- rep(1,g)
-		}
+	  if(norm == 2){
+	    group.pen.factor <- sqrt(xtabs(~groups))
+	  } else{
+	    group.pen.factor <- rep(1,g)
+	  }
 	}
+	if(norm != 1 & norm != 2){
+		stop("norm must be 1 or 2")
+	}
+	if(length(y)!=nrow(x)){
+	  stop("length of x and number of rows in x are not the same")
+	}
+	if(is.null(weights)==FALSE){
+	  if( penalty=="ENet" | penalty=="Ridge"){
+	    stop("Cannot use weights with elastic net or ridge penalty. Can use it with lasso, though may be much slower than unweighted version.")
+	  }
+	  if(penalty=="aLASSO"){
+	    warning("Weights are ignored when getting initial (Ridge) estimates for adaptive Lasso")
+	  }
+	  if(length(weights)!=length(y)){
+	    stop("number of weights does not match number of responses")
+	  }
+	  if(sum(weights<=0)>0){
+	    stop("all weights most be positive")
+	  }
+	}
+	if(is.matrix(y)==TRUE){
+	  y <- as.numeric(y)
+	}
+	if(min(group.pen.factor) < 0 | min(tau.penalty.factor) < 0){
+	  stop("Penalty factors must be non-negative.")
+	}
+	if(sum(group.pen.factor)==0 | sum(tau.penalty.factor)==0){
+	  stop("Cannot have zero for all entries of penalty factors. This would be an unpenalized model")
+	}
+	
 	dims <- dim(x)
 	n <- dims[1]
 	p <- dims[2]
@@ -2142,7 +2202,7 @@ rq.group.pen <- function(x,y, tau=.5,groups=1:ncol(x), penalty=c("gLASSO","gAdLA
 							tau.penalty.factor=tau.penalty.factor,max.iter=max.iter,coef.cutoff=coef.cutoff,converge.eps=converge.eps,
 							gamma=gamma,lambda.discard=lambda.discard,weights,...)
 			} else{
-				init.model <- rq.glasso(x,y,tau,groups, lambda, group.pen.factor,scalex,tau.penalty.factor,max.iter,converge.eps,gamma,lambda.discard=lambda.discard,...)
+				init.model <- rq.glasso(x,y,tau,groups, lambda, group.pen.factor,scalex,tau.penalty.factor,max.iter,converge.eps,gamma,lambda.discard=lambda.discard,weights=weights,...)
 			}
 		}
 		return_val <- rq.group.lla(init.model,x,y,groups,penalty=penalty,a=a,norm=norm,group.pen.factor=group.pen.factor,tau.penalty.factor=tau.penalty.factor,scalex=scalex,coef.cutoff=coef.cutoff,max.iter=max.iter,converge.eps=converge.eps,gamma=gamma,lambda.discard=lambda.discard,weights=weights,...)
