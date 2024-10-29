@@ -1,3 +1,74 @@
+checkCross <- function(preds, ntau, lambdaIndex, sort, penalty){
+#used to check quantiles for the structure we have where the ordering is tau then lambda so it is tau1L1,tau1L2,...,tauKLFinal
+  nlambda <- length(lambdaIndex)
+  crossPresent <- FALSE
+  lambdaCross <- NULL
+  obsCross <- NULL
+  for(i in 1:nlambda){
+    spots <- seq(i,(ntau-1)*nlambda+i,by=nlambda)
+    subPreds <- preds[,spots]
+    if(is.null(dim(subPreds))){
+      cross <- is.unsorted(subPreds)
+    } else{
+      cross <- apply(subPreds,1,is.unsorted)
+    }
+    if(sum(cross)>1){
+      crossPresent <- TRUE
+      crossSpots <- which(cross==1)
+      if(sort){
+        cNames <- colnames(preds)
+        preds[crossSpots,spots] <- t(apply(preds[crossSpots,spots],1,sort))  
+        colnames(preds) <- cNames
+      }
+      lambdaCross <- c(lambdaCross,i)
+      obsCross <- c(obsCross,crossSpots)
+    }
+  }
+  warningMessage <- NULL
+  if(crossPresent){
+    if(length(lambdaCross)==1){
+      if(sort){
+        warningMessage <- paste("Predictions sorted for lambda", lambdaIndex[lambdaCross], "due to crossing quantiles at observations", paste(obsCross,collapse=", "))
+      } else{
+        warningMessage <- paste("Predictions for lambda", lambdaIndex[lambdaCross], "have crossing quantiles at observations", paste(obsCross,collapse=", "))
+      }
+    } else{
+      if(sort){
+        warningMessage <- paste("Predictions sorted for lambda indices", paste(lambdaCross,collapse=", "), "due to crossing quantiles")
+      } else{
+        warningMessage <- paste("Crossing quantiles for predictions at lambda indices", paste(lambdaCross,collapse=", "))
+      }
+    }
+    if(penalty !="gq"){
+      warningMessage <- paste(warningMessage, "Using rq.gq.pen() may reduce the number of crossings")
+    }
+    warning(warningMessage)
+  }
+  preds 
+}
+
+#need to fix this code
+checkCrossSep <- function(preds, sort, penalty){
+  #used to check quantiles for the structure we have where the ordering is tau then lambda so it is tau1L1,tau1L2,...,tauKLFinal
+  cross <- apply(preds, 1, is.unsorted)
+  if(sum(cross)>1){
+    crossSpots <- which(cross)
+    if(sort){
+      cnames <- colnames(preds)
+      preds <- t(apply(preds,1,sort))
+      colnames(preds) <- cnames
+      warningMessage <- paste("Quantile predictions sorted at observations ", paste(crossSpots, collapse=", ") , " when using seperate optimization for each lambda. Setting septau=FALSE may reduce the number of crossings.")
+    } else{
+      warningMessage <- paste("Crossing quantiles at observations ", paste(crossSpots, collapse=", "), " when using seperate optimization for each lambda. Setting septau=FALSE may reduce the number of crossings.")
+    }
+    if(penalty !="gq"){
+      warningMessage <- paste(warningMessage, "In addition, using rq.gq.pen() may reduce the number of crossings.")
+    }
+    warning(warningMessage)
+  }
+  preds 
+}
+
 lambdanum <- function(model){
 	length(model$rho)
 }
@@ -1129,20 +1200,6 @@ rq.group.lin.prog <- function(x,y,groups,tau,lambda,intercept=TRUE,eps=1e-05,pen
     sub_fit$penalty <- penalty
     class(sub_fit) <-  c("rq.pen", "rqNC")
     sub_fit
-}
-
-nonzero <- function (obj) 
-{
-    UseMethod("nonzero")
-}
-
-nonzero.cv.rq.group.pen <- function (obj) 
-{
-    coefs <- coefficients(obj)
-    if (obj$intercept) {
-		coefs <- coefs[-1]
-    }
-    tapply(coefs, obj$groups, sum) != 0
 }
 
 subtract <- function(predicted,obs){

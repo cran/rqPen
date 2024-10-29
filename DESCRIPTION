@@ -1,9 +1,11 @@
 Package: rqPen
 Type: Package
 Title: Penalized Quantile Regression
-Version: 4.1.1
-Date: 2024-05-31
-Author: Ben Sherwood [aut, cre], Adam Maidman [aut], Shaobo Li [aut] 
+Version: 4.1.2
+Date: 2024-10-28
+Authors@R: c( person(given="Ben",family="Sherwood",role=c("aut","cre"), email="ben.sherwood@ku.edu"),
+              person(given="Shaobo", family="Li", role="aut"),
+              person(given="Adam", family="Maidman", role="aut"))
 Depends: R (>= 3.0.0)
 Imports: methods, quantreg, hqreg, hrqglas, data.table, Rdpack,
         lifecycle, plyr, Matrix, Rcpp
@@ -17,8 +19,11 @@ Encoding: UTF-8
 License: MIT + file LICENSE
 URL:
         https://github.com/bssherwood/rqpen/blob/master/ignore/rqPenArticle.pdf
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.2
 NeedsCompilation: yes
-Packaged: 2024-05-31 15:23:59 UTC; b157s966
+Packaged: 2024-10-29 15:39:21 UTC; b157s966
+Author: Ben Sherwood [aut, cre],
+  Shaobo Li [aut],
+  Adam Maidman [aut]
 Repository: CRAN
-Date/Publication: 2024-06-04 13:30:01 UTC
+Date/Publication: 2024-10-29 16:10:02 UTC

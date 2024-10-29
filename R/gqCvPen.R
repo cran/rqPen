@@ -62,6 +62,7 @@ rq.gq.pen.cv <- function(x=NULL, y=NULL, tau=NULL, lambda=NULL, nfolds=10, cvFun
   #  lambda<- model_obj$lambda
   #  fullmodel<- model_obj
   #}else{
+  n <- length(y)
   
   
   if(is.null(weights)){
@@ -84,7 +85,6 @@ rq.gq.pen.cv <- function(x=NULL, y=NULL, tau=NULL, lambda=NULL, nfolds=10, cvFun
   #   tauWeights <- tauWeights/sum(tauWeights)
   # } 
   
-  n <- length(y)
   if(is.null(foldid)){
     foldid <- sample(rep(1:nfolds, length=n))
   } else{
@@ -107,16 +107,20 @@ rq.gq.pen.cv <- function(x=NULL, y=NULL, tau=NULL, lambda=NULL, nfolds=10, cvFun
     test_wts <- weights[ind]
     
     train_model<- rq.gq.pen(x=train_x, y=train_y, tau=tau, lambda=lambda, lambda.discard=FALSE, weights=train_wts, ...) #,...
-    pred<- predict(train_model, newx = test_x)
+    if(is.null(dim(test_x))){
+      preds <- c(1,test_x) %*% coefficients(train_model)
+    } else{
+      preds <- cbind(1,test_x) %*% coefficients(train_model)
+    }
     #print(pred[,c(5,10,15)])
     if(cvFunc == "se"){
-      se<- (test_y-pred)^2*test_wts
+      se<- (test_y-preds)^2*test_wts
       mse[,i]<- apply(se,2,mean)#as.vector(do.call(c, lapply(se, apply, 2,mean))) 
     } 
     if(cvFunc == "rq"){
 	    #double for loop that could be removed
       #hacky code
-  	  test_err <- test_y-pred
+  	  test_err <- test_y-preds
   	  tpos <- 1
   	  for(tauval in tau){
   	    posseq <- seq(tpos,(nlambda-1)*ntau+tpos,ntau)

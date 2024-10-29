@@ -288,7 +288,8 @@ print.qic.select <- function(x,...){
 #'
 #' @param object qic.select object
 #' @param newx Data matrix to make predictions from. 
-#' @param ... optional arguments
+#' @param sort If there are crossing quantiles the predictions will be sorted to avoid this issue.
+#' @param ... No additional parameters are used but this is needed for how R handles predict functions.  
 #'
 #' @return A matrix of predicted values.
 #' @export
@@ -301,12 +302,25 @@ print.qic.select <- function(x,...){
 #' newx <- matrix(runif(80),ncol=8)
 #' preds <- predict(q1,newx)
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu}
-predict.qic.select <- function(object, newx, ...){
+predict.qic.select <- function(object, newx, sort=FALSE, ...){
 	if(is.null(dim(newx))){
-	  c(1,newx) %*% coefficients(object)
+	  preds <- c(1,newx) %*% coefficients(object)
 	} else{
-	  cbind(1,newx) %*% coefficients(object)
+	  preds <- cbind(1,newx) %*% coefficients(object)
+	  cross <- apply(preds,1,is.unsorted)
+	  if(sum(cross)>0){
+	    crossSpots <- which(cross)
+	    if(sort){
+	      warning(paste("Quantile predictions at observations", paste(crossSpots, collapse=", "), "sorted due to crossing quantiles in original predictions."))  
+	      cNames <- colnames(preds)
+	      preds[crossSpots,] <- t(apply(preds[crossSpots,],1,sort))  
+	      colnames(preds) <- cNames
+	    } else{
+	      warning(paste("Crossing quantiles at observations", paste(crossSpots,collapse=", ")))
+	    }
+	  }
 	}
+  preds
 }
 
 
@@ -417,7 +431,7 @@ coef.cv.rq.pen <- function(object, lambda='min',...){
 #' \describe{
 #' \item{coefficients:}{ Coefficients for each value of lambda.}
 #' \item{rho:}{ The unpenalized objective function for each value of lambda.}
-#' \item{PenRho:}{ The penalized objective function for each value of lambda.}
+#' \item{PenRho:}{ The penalized objective function for each value of lambda. If scalex=TRUE then this is the value for the scaled version of x.}
 #' \item{nzero:}{ The number of nonzero coefficients for each value of lambda.}
 #' \item{tau:}{ Quantile of the model.}
 #' \item{a:}{ Value of a for the penalized loss function.}
@@ -455,12 +469,21 @@ coef.cv.rq.pen <- function(object, lambda='min',...){
 #' \insertRef{qr_cd}{rqPen}
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu}, Shaobo Li, and Adam Maidman
 rq.pen <- function(x,y,tau=.5,lambda=NULL,penalty=c("LASSO","Ridge","ENet","aLASSO","SCAD","MCP"),a=NULL,nlambda=100,eps=ifelse(nrow(x)<ncol(x),.05,.01), 
-	penalty.factor = rep(1, ncol(x)),alg=c("huber","br","QICD","fn"),scalex=TRUE,tau.penalty.factor=rep(1,length(tau)),
-	coef.cutoff=1e-8,max.iter=10000,converge.eps=1e-7,lambda.discard=TRUE,weights=NULL,...){
+	penalty.factor = rep(1, ncol(x)),alg=c("huber","br","fn"),scalex=TRUE,tau.penalty.factor=rep(1,length(tau)),
+	coef.cutoff=1e-8,max.iter=5000,converge.eps=1e-4,lambda.discard=TRUE,weights=NULL,...){
 	penalty <- match.arg(penalty)
 	alg <- match.arg(alg)
+	if(length(tau)>length(unique(tau))){
+	  stop("All entries of tau should be unique")
+	}
+	if(is.unsorted(tau)){
+	  stop("Quantile values should be entered in ascending order")
+	}
 	if(length(y)!=nrow(x)){
 	  stop("length of x and number of rows in x are not the same")
+	}
+	if(min(apply(x,2,sd))==0){
+		stop("At least one of the x predictors has a standard deviation of zero")
 	}
 	if(is.null(weights)==FALSE){
 	  if( penalty=="ENet" | penalty=="Ridge"){
@@ -584,6 +607,9 @@ coef.rq.pen.seq <- function(object,tau=NULL,a=NULL,lambda=NULL,modelsIndex=NULL,
 #' @param septau Whether tuning parameter should be optimized separately for each quantile. 
 #' @param cvmin If TRUE then minimum error is used, if FALSE then one standard error rule is used. 
 #' @param useDefaults Whether the default results are used. Set to FALSE if you you want to specify specific models and lambda values. 
+#' @param lambda The value of lambda for which predictions are wanted. Ignored unless useDefaults is set to false.
+#' @param lambdaIndex The indices for lambda for which predictions are wanted. Ignored unless useDefaults is set to false. 
+#' @param sort If there are crossing quantiles the predictions will be sorted to avoid this issue. 
 #' @param ... Additional parameters sent to coef.rq.pen.seq.cv(). 
 #'
 #' @return A matrix of predictions for each tau and a combination
@@ -596,17 +622,48 @@ coef.rq.pen.seq <- function(object,tau=NULL,a=NULL,lambda=NULL,modelsIndex=NULL,
 #' newx <- matrix(runif(80),ncol=8)
 #' cvpreds <- predict(m1,newx)
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu}
-predict.rq.pen.seq.cv <- function(object, newx,tau=NULL,septau=ifelse(object$fit$penalty!="gq",TRUE,FALSE),cvmin=TRUE,useDefaults=TRUE,...){
+predict.rq.pen.seq.cv <- function(object, newx,tau=NULL,septau=ifelse(object$fit$penalty!="gq",TRUE,FALSE),cvmin=TRUE,useDefaults=TRUE,sort=FALSE,lambda=NULL,lambdaIndex=NULL,...){
   if(object$fit$penalty=="gq" & septau){
     septau = FALSE
     warning("septau set to false because group quantile penalty was used, which is a joint optimization across all quantiles")
   }
-  coefs <- coefficients(object,septau=septau,cvmin=cvmin,useDefaults=useDefaults,tau=tau,...)
+  coefs <- coefficients(object,septau=septau,cvmin=cvmin,useDefaults=useDefaults,tau=tau,lambda=lambda,lambdaIndex=lambdaIndex,...)
   if(is.null(dim(newx))){
-    c(1,newx) %*% coefs  
+    preds <- c(1,newx) %*% coefs  
   } else{
-    cbind(1,newx) %*% coefs
+    preds <- cbind(1,newx) %*% coefs
   }
+  if(is.null(tau)){
+    tau <- object$fit$tau
+  }
+  ntau <- length(tau)
+  if(useDefaults){
+    if(septau){
+      if(cvmin){
+        lambdaIndex <- object$btr$lambdaIndex
+      } else{
+        lambdaIndex <- object$btr$lambda1seIndex  
+      }
+      preds <- checkCrossSep(preds, sort, object$fit$penalty)
+    } else{
+      if(cvmin){
+        lambdaIndex <- object$gtr$lambdaIndex[1]
+      } else{
+        lambdaIndex <- object$gtr$lambda1seIndex[1]
+      }
+      preds <- checkCross(preds, ntau, lambdaIndex, sort, object$fit$penalty)
+    }
+  } else{
+    if(is.null(lambdaIndex)){
+      if(is.null(lambda)){
+        lambdaIndex <- 1:length(object$fit$lambda)
+      } else{
+        lambdaIndex <- which(object$fit$lambda %in% lambda)
+      }
+    }
+    preds <- checkCross(preds, ntau, lambdaIndex, sort, object$fit$penalty)
+  }
+  preds
 }
 
 #' Predictions from rq.pen.seq object
@@ -618,6 +675,7 @@ predict.rq.pen.seq.cv <- function(object, newx,tau=NULL,septau=ifelse(object$fit
 #' @param lambda Tuning parameter of \eqn{\lambda}. Default is NULL, which returns coefficients for all values of \eqn{\lambda}.
 #' @param modelsIndex Index of the models for which coefficients should be returned. Does not need to be specified if tau or a are specified. 
 #' @param lambdaIndex Index of the lambda values for which coefficients should be returned. Does not need to be specified if lambda is specified. 
+#' @param sort If there are crossing quantiles the predictions will be sorted to avoid this issue. 
 #' @param ... Additional parameters passed to coef.rq.pen.seq() 
 #'
 #' @return A matrix of predictions for each tau and a combination
@@ -633,14 +691,28 @@ predict.rq.pen.seq.cv <- function(object, newx,tau=NULL,septau=ifelse(object$fit
 #' idxApproach <- predict(m1,newx,modelsIndex=2)
 #' bothIdxApproach <- predict(m1,newx,modelsIndex=2,lambdaIndex=1)
 #' @author Ben Sherwood, \email{ben.sherwood@ku.edu}
-predict.rq.pen.seq <- function(object, newx,tau=NULL,a=NULL,lambda=NULL,modelsIndex=NULL,lambdaIndex=NULL,...){
+predict.rq.pen.seq <- function(object, newx,tau=NULL,a=NULL,lambda=NULL,modelsIndex=NULL,lambdaIndex=NULL,sort=FALSE,...){
   coefs <- coefficients(object,tau,a,lambda,modelsIndex,lambdaIndex,...)
   #lapply(coefs, quick.predict,newx=newx)
   if(is.null(dim(newx))){
-    c(1,newx) %*% coefs
+    preds <- c(1,newx) %*% coefs
   } else{
-    cbind(1,newx) %*% coefs
+    preds <- cbind(1,newx) %*% coefs
   }
+  if(is.null(tau) & is.null(modelsIndex)){
+    ntau <- length(object$tau)
+  } else{
+    ntau <- max(length(tau),length(modelsIndex))
+  }
+  if(is.null(lambdaIndex)){
+    if(is.null(lambda)){
+      lambdaIndex <- 1:length(object$lambda)
+    } else{
+      lambdaIndex <- which(object$lambda %in% lambda)
+    }
+  }
+  preds <- checkCross(preds,ntau,lambdaIndex,sort,object$penalty)
+  preds
 }
 
 #' Does k-folds cross validation for rq.pen. If multiple values of a are specified then does a grid based search for best value of \eqn{\lambda} and a.
@@ -1070,7 +1142,7 @@ rq.group.pen.cv <- function(x,y,tau=.5,groups=1:ncol(x),lambda=NULL,a=NULL,cvFun
 #' @return Returns the following:
 #' \describe{
 #' \item{coefficients}{Coefficients from the penalized model.}
-#' \item{PenRho}{Penalized objective function value.}
+#' \item{PenRho}{Penalized objective function value.  If scalex=TRUE then this is the value for the scaled version of x.}
 #' \item{residuals}{ Residuals from the model.}
 #' \item{rho}{ Objective function evaluation without the penalty.}
 #' \item{coefficients}{ Coefficients from the penalized model.} 
@@ -1811,7 +1883,7 @@ plot.cv.rq.group.pen <- function (x,...)
 #' Returns the following:
 #' \describe{
 #' \item{coefficients}{ Coefficients from the penalized model.} 
-#' \item{PenRho}{ Penalized objective function value.}
+#' \item{PenRho}{ Penalized objective function value.  If scalex=TRUE then this is the value for the scaled version of x.}
 #' \item{residuals}{ Residuals from the model.}
 #' \item{rho}{ Objective function evaluation without the penalty.}
 #' \item{tau}{ Conditional quantile being modeled.}
@@ -2055,7 +2127,7 @@ coef.cv.rq.group.pen <- function(object, lambda='min',...){
 #' \describe{
 #' \item{coefficients}{Coefficients for each value of lambda.}
 #' \item{rho}{The unpenalized objective function for each value of lambda.}
-#' \item{PenRho}{The penalized objective function for each value of lambda.}
+#' \item{PenRho}{The penalized objective function for each value of lambda.  If scalex=TRUE then this is the value for the scaled version of x.}
 #' \item{nzero}{The number of nonzero coefficients for each value of lambda.}
 #' \item{tau}{Quantile of the model.}
 #' \item{a}{Value of a for the penalized loss function.}
@@ -2084,11 +2156,21 @@ coef.cv.rq.group.pen <- function(object, lambda='min',...){
 rq.group.pen <- function(x,y, tau=.5,groups=1:ncol(x), penalty=c("gLASSO","gAdLASSO","gSCAD","gMCP"),
 						lambda=NULL,nlambda=100,eps=ifelse(nrow(x)<ncol(x),.05,.01),alg=c("huber","br"), 
 						a=NULL, norm=2, group.pen.factor=NULL,tau.penalty.factor=rep(1,length(tau)),
-						scalex=TRUE,coef.cutoff=1e-8,max.iter=500,converge.eps=1e-4,gamma=IQR(y)/10, lambda.discard=TRUE,weights=NULL, ...){
+						scalex=TRUE,coef.cutoff=1e-8,max.iter=5000,converge.eps=1e-4,gamma=IQR(y)/10, lambda.discard=TRUE,weights=NULL, ...){
 	penalty <- match.arg(penalty)
 	alg <- match.arg(alg)
 	
+	if(length(tau)>length(unique(tau))){
+	  stop("All entries of tau should be unique")
+	}
+	if(is.unsorted(tau)){
+	  stop("Quantile values should be entered in ascending order")
+	}
+	
 	g <- length(unique(groups))
+	if(min(apply(x,2,sd))==0){
+		stop("At least one of the x predictors has a standard deviation of zero")
+	}
 	if(is.null(group.pen.factor)){
 	  if(norm == 2){
 	    group.pen.factor <- sqrt(xtabs(~groups))
