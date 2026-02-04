@@ -80,7 +80,7 @@ rq.gq.pen <- function(x, y, tau, lambda=NULL, nlambda=100,  eps = ifelse(nrow(x)
   n<- np[1]; p<- np[2]
   #ng<- p
   nng<- rep(ntau, p)
-  if(is.null(penalty.factor)) penalty.factor<- 1
+  if(is.null(penalty.factor)) penalty.factor<- rep(1,p)
   if(is.null(weights)) weights<- rep(1, n)
   if(is.null(tau.penalty.factor)) tau.penalty.factor<- rep(1, ntau)
   
@@ -118,7 +118,15 @@ rq.gq.pen <- function(x, y, tau, lambda=NULL, nlambda=100,  eps = ifelse(nrow(x)
   if(sum(penalty.factor)==0 | sum(tau.penalty.factor)==0){
     stop("Cannot have zero for all entries of penalty factors. This would be an unpenalized model")
   }
-
+  if(length(penalty.factor)!=p){
+    stop("penalty.factor should be a length p vector")
+  }
+  if(length(tau.penalty.factor) != ntau){
+    stop("length of tau.penalty.factor should be the number of quantiles being modeled")
+  }
+  if(sum(penalty.factor==0) >= n){
+    stop("The number of unpenalized variables must be smaller than n")
+  }
   ## standardize X
   if(scalex){
     x <- scale(x)
@@ -140,15 +148,22 @@ rq.gq.pen <- function(x, y, tau, lambda=NULL, nlambda=100,  eps = ifelse(nrow(x)
   
   ## initial value
   gmma0<- gmma
-  if(is.null(beta0)){
-    # intercept 
-    b.int<- quantile(y, probs = tau)
-    r<- Yaug-rep(b.int, each=n)
-    # null devience
-    dev0<- sum(weights_aug*rq.loss.aug(r,tau,n))
-    gmma.max<- 4; gmma<- min(gmma.max, max(gmma0, quantile(abs(r), probs = 0.1)))
-    beta0<- c(t(rbind(b.int, matrix(0,p, ntau)))) 
+  if(is.null(beta0) & min(penalty.factor)>0){
+      # intercept 
+      b.int<- quantile(y, probs = tau)
+      r<- Yaug-rep(b.int, each=n)
+      # null devience
+      dev0<- sum(weights_aug*rq.loss.aug(r,tau,n))
+      gmma.max<- 4; gmma<- min(gmma.max, max(gmma0, quantile(abs(r), probs = 0.1)))
+      beta0<- c(t(rbind(b.int, matrix(0,p, ntau))))
   } else{
+    if(is.null(beta0)){
+      #issue is that some vars are not penalized
+      beta0 <- matrix(0,nrow=p+1,ncol=ntau)
+      keepvars <- which(penalty.factor == 0)
+      initmodel <- rq(y ~ x[,keepvars], tau=tau)
+      beta0[c(1,keepvars+1),] <- coefficients(initmodel)
+    }
     r <- Yaug - c(cbind(1, x)%*%beta0)   # beta0 must be of the dimension (p+1)*ntau
     beta0 <- c(t(beta0))   
     dev0<- sum(rq.loss.aug(r,tau,n))
@@ -162,12 +177,19 @@ rq.gq.pen <- function(x, y, tau, lambda=NULL, nlambda=100,  eps = ifelse(nrow(x)
   grad_k<- -neg_gradient_aug(r0, weights_aug, tau_aug, gmma, Xaug, ntau) ## Rcpp
   #grad_k.norm<- tapply(grad_k, groupIndex, l2norm)
   grad_k.norm<- tapply(grad_k, groupIndex, weighted_norm, normweights=tau.penalty.factor)
+  penvars <- which(penalty.factor!=0)
   
-  lambda.max<- max(grad_k.norm/penalty.factor)
+  lambda.max<- max(grad_k.norm[penvars]/penalty.factor[penvars])
+  lambda.preset <- FALSE
   if(is.null(lambda)){
     lambda.min<- lambda.max*eps #ifelse(n>p, lambda.max*0.001, lambda.max*0.01)
     #lambda<- seq(lambda.max, lambda.min, length.out = 100)
     lambda<- exp(seq(log(lambda.max), log(lambda.min), length.out = nlambda+1))
+  } else{
+    lambda.preset <- TRUE
+    #a hack to have this case work with the rest of the code, which assumes first lambda provides a sparse solution.
+    diff <- lambda[1] - lambda[2]
+    lambda <- c(lambda[1] + diff, lambda)
   }
   
   ## QM condition in Yang and Zou, Lemma 1 (2) -- PD matrix H
@@ -314,14 +336,18 @@ rq.gq.pen <- function(x, y, tau, lambda=NULL, nlambda=100,  eps = ifelse(nrow(x)
       loss[j]<- dev1/n
       pen.loss[j]<- dev1/n+lambda[j]*sum(eigen.sub.H*sapply(1:p, function(xx) l2norm(beta0[-(1:ntau)][groupIndex==xx])))
       rel_dev[j]<- dev1/dev0
-	  if(j > 1){
-		rel_dev_change<- rel_dev[j]-rel_dev[j-1]
-		if(abs(rel_dev_change)<1e-3 & j>70 & lambda.discard) break
+	    if(j > 1){
+		    rel_dev_change<- rel_dev[j]-rel_dev[j-1]
+		    if(abs(rel_dev_change)<1e-3 & j>70 & lambda.discard) break
       }
     } # end of for loop of lambda
     
     
     stop.ind<- which(rel_dev!=0)
+    if(lambda.preset){
+      stop.ind <- stop.ind[-1]#removing the first initial beta for this group because the initial lambda was not actually part of the preset lambda values
+                              #see code around setting lambda values for more details on why this is done. 
+    }
     if(length(stop.ind)==0) stop.ind<- 1:length(lambda)
     
       stop.ind<- stop.ind#[-1]
@@ -358,7 +384,7 @@ rq.gq.pen <- function(x, y, tau, lambda=NULL, nlambda=100,  eps = ifelse(nrow(x)
     if(scalex){
       coefs <- apply(coefs, 2, transform_coefs,mu_x,sigma_x)
     }
-    models[[i]] <- rq.pen.modelreturn(coefs,x,y,tau[i],lambda,penalty.factor*tau.penalty.factor[i],"gq",1,weights=weights)
+    models[[i]] <- rq.pen.modelreturn(coefs,x,y,tau[i],output$lambda,penalty.factor*tau.penalty.factor[i],"gq",1,weights=weights)
     modelnames <- c(modelnames,paste0("tau",tau[i],"a",1))
     modelsInfo <- rbind(modelsInfo,c(i,1,tau[i]))
   }
@@ -366,7 +392,7 @@ rq.gq.pen <- function(x, y, tau, lambda=NULL, nlambda=100,  eps = ifelse(nrow(x)
   modelsInfo <- data.frame(modelsInfo)
   colnames(modelsInfo) <- c("modelIndex","a","tau")
   names(models) <- modelnames
-  returnVal <- list(models=models, n=n, p=p,alg="huber",tau=tau, a=1,modelsInfo=modelsInfo,lambda=lambda[1:ncol(coefs)],penalty="gq",call=match.call())
+  returnVal <- list(models=models, n=n, p=p,alg="huber",tau=tau, a=1,modelsInfo=modelsInfo,lambda=output$lambda,penalty="gq",call=match.call())
   class(returnVal) <- "rq.pen.seq"
   returnVal
 } # end of function
